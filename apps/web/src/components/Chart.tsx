@@ -1,0 +1,343 @@
+import { useEffect, useRef } from "react";
+import {
+  createChart,
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+  ColorType,
+  type LogicalRange,
+  type UTCTimestamp,
+} from "lightweight-charts";
+import type { Candle, Signal } from "../../../../packages/shared/src/domain";
+import {
+  ema,
+  bollinger,
+  rsi,
+  macd,
+  atr,
+} from "../../../../packages/shared/src/engine";
+import { structure } from "../../../../packages/shared/src/structure";
+import { useStore } from "../store";
+export default function MarketChart({
+  candles,
+  indicators,
+  signals,
+  onPrice,
+}: {
+  candles: Candle[];
+  indicators: string[];
+  signals: Signal[];
+  onPrice?: (price: number) => void;
+}) {
+  const container = useRef<HTMLDivElement>(null),
+    overlay = useRef<HTMLCanvasElement>(null),
+    settings = useStore((s) => s.settings),
+    dataRef = useRef(candles),
+    priceCallback = useRef(onPrice),
+    updateRef = useRef<((candles: Candle[]) => void) | null>(null),
+    rangeRef = useRef<LogicalRange | null>(null);
+  dataRef.current = candles;
+  priceCallback.current = onPrice;
+  useEffect(() => {
+    if (!container.current) return;
+    const chart = createChart(container.current, {
+      autoSize: true,
+      layout: {
+        background: { type: ColorType.Solid, color: "#161a17" },
+        textColor: "#88918a",
+        fontFamily: "DM Sans",
+        attributionLogo: false,
+      },
+      grid: {
+        vertLines: { color: "#232a24" },
+        horzLines: { color: "#232a24" },
+      },
+      crosshair: {
+        vertLine: { color: "#93a17b" },
+        horzLine: { color: "#93a17b" },
+      },
+      rightPriceScale: {
+        borderColor: "#2a322b",
+        scaleMargins: { top: 0.12, bottom: 0.24 },
+      },
+      timeScale: {
+        timeVisible: true,
+        secondsVisible: false,
+        borderColor: "#2a322b",
+      },
+    });
+    const updaters: ((data: Candle[]) => void)[] = [],
+      addUpdate = (update: (data: Candle[]) => void) => {
+        updaters.push(update);
+        update(dataRef.current);
+      },
+      timed = (data: Candle[], values: number[]) =>
+        data.map((c, i) => ({
+          time: c.time as UTCTimestamp,
+          value: values[i],
+        }));
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: "#b6d885",
+      downColor: "#d08673",
+      wickUpColor: "#b6d885",
+      wickDownColor: "#d08673",
+      borderVisible: false,
+    });
+    addUpdate((data) =>
+      candleSeries.setData(
+        data.map((c) => ({ ...c, time: c.time as UTCTimestamp })),
+      ),
+    );
+    const line = (
+      calculate: (data: Candle[]) => number[],
+      color: string,
+      title: string,
+      pane = 0,
+      priceScaleId?: string,
+    ) => {
+      const series = chart.addSeries(
+        LineSeries,
+        {
+          color,
+          lineWidth: 1,
+          priceLineVisible: false,
+          lastValueVisible: false,
+          title,
+          priceScaleId,
+        },
+        pane,
+      );
+      addUpdate((data) => series.setData(timed(data, calculate(data))));
+      return series;
+    };
+    if (indicators.includes("EMA")) {
+      line(
+        (data) =>
+          ema(
+            data.map((c) => c.close),
+            settings.emaFast,
+          ),
+        "#e4ba75",
+        `EMA ${settings.emaFast}`,
+      );
+      line(
+        (data) =>
+          ema(
+            data.map((c) => c.close),
+            settings.emaSlow,
+          ),
+        "#879cd0",
+        `EMA ${settings.emaSlow}`,
+      );
+    }
+    if (indicators.includes("BB")) {
+      line(
+        (data) => bollinger(data.map((c) => c.close)).map((b) => b.upper),
+        "#6b8791",
+        "BB upper",
+      );
+      line(
+        (data) => bollinger(data.map((c) => c.close)).map((b) => b.lower),
+        "#6b8791",
+        "BB lower",
+      );
+    }
+    if (indicators.includes("Volume")) {
+      const volume = chart.addSeries(HistogramSeries, {
+        priceFormat: { type: "volume" },
+        priceScaleId: "volume",
+        priceLineVisible: false,
+        lastValueVisible: false,
+      });
+      volume
+        .priceScale()
+        .applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
+      addUpdate((data) =>
+        volume.setData(
+          data.map((c) => ({
+            time: c.time as UTCTimestamp,
+            value: c.volume,
+            color: c.close >= c.open ? "#8ca75f66" : "#a56e5b66",
+          })),
+        ),
+      );
+    }
+    let pane = 1;
+    if (indicators.includes("RSI")) {
+      const series = line(
+        (data) =>
+          rsi(
+            data.map((c) => c.close),
+            settings.rsiPeriod,
+          ),
+        "#b9a2cf",
+        "RSI",
+        pane,
+        "rsi",
+      );
+      chart.panes()[pane++].setHeight(90);
+      for (const p of [30, 70])
+        series.createPriceLine({
+          price: p,
+          color: "#5b5564",
+          lineWidth: 1,
+          lineStyle: 2,
+          axisLabelVisible: false,
+          title: String(p),
+        });
+    }
+    if (indicators.includes("MACD")) {
+      const histogram = chart.addSeries(
+        HistogramSeries,
+        {
+          priceScaleId: "macd",
+          priceLineVisible: false,
+          lastValueVisible: false,
+        },
+        pane,
+      );
+      addUpdate((data) =>
+        histogram.setData(
+          macd(data.map((c) => c.close)).histogram.map((value, i) => ({
+            time: data[i].time as UTCTimestamp,
+            value,
+            color: value >= 0 ? "#b6d88588" : "#d0867388",
+          })),
+        ),
+      );
+      line(
+        (data) => macd(data.map((c) => c.close)).line,
+        "#a8bed4",
+        "MACD",
+        pane,
+        "macd",
+      );
+      line(
+        (data) => macd(data.map((c) => c.close)).signal,
+        "#e4ba75",
+        "Signal",
+        pane,
+        "macd",
+      );
+      chart.panes()[pane++].setHeight(90);
+    }
+    if (indicators.includes("ATR")) {
+      line(
+        (data) => data.map((_, i) => atr(data.slice(0, i + 1))),
+        "#97bca5",
+        "ATR",
+        pane,
+        "atr",
+      );
+      chart.panes()[pane++].setHeight(80);
+    }
+    if (indicators.includes("Sinyal"))
+      signals
+        .filter((s) => ["aktif", "menunggu_entry"].includes(s.status))
+        .forEach((s) => {
+          candleSeries.createPriceLine({
+            price: s.levels.entry[1],
+            color: "#e2c78f",
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: "ENTRY",
+          });
+          candleSeries.createPriceLine({
+            price: s.levels.sl,
+            color: "#cd8476",
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: "SL",
+          });
+          s.levels.tp.forEach((tp, i) =>
+            candleSeries.createPriceLine({
+              price: tp,
+              color: "#a8c67d",
+              lineWidth: 1,
+              lineStyle: 2,
+              axisLabelVisible: true,
+              title: `TP${i + 1}`,
+            }),
+          );
+        });
+    chart.subscribeClick((event) => {
+      if (event.point) {
+        const p = candleSeries.coordinateToPrice(event.point.y);
+        if (p !== null) priceCallback.current?.(p);
+      }
+    });
+    const drawZones = () => {
+      const canvas = overlay.current;
+      if (!canvas || !container.current) return;
+      const ratio = window.devicePixelRatio || 1,
+        width = container.current.clientWidth,
+        height = container.current.clientHeight;
+      canvas.width = width * ratio;
+      canvas.height = height * ratio;
+      const ctx = canvas.getContext("2d")!;
+      ctx.scale(ratio, ratio);
+      if (!indicators.includes("SMC")) return;
+      for (const z of structure(dataRef.current, settings.swing).zones) {
+        const a = candleSeries.priceToCoordinate(z.high),
+          b = candleSeries.priceToCoordinate(z.low),
+          x = chart.timeScale().timeToCoordinate(z.from as UTCTimestamp);
+        if (a === null || b === null || x === null) continue;
+        const left = Math.max(0, x),
+          widthZone = width - chart.priceScale("right").width() - left;
+        if (widthZone <= 0) continue;
+        ctx.fillStyle = z.direction === "long" ? "#b6d88515" : "#d0867315";
+        ctx.strokeStyle = z.direction === "long" ? "#b6d88555" : "#d0867355";
+        ctx.fillRect(left, a, widthZone, b - a);
+        ctx.strokeRect(left, a, widthZone, b - a);
+        ctx.font = "10px DM Sans";
+        ctx.fillStyle = "#a4b396";
+        ctx.fillText(z.type, left + 5, a + 13);
+      }
+    };
+    updateRef.current = (data) => {
+      for (const update of updaters) update(data);
+      drawZones();
+    };
+    if (rangeRef.current)
+      chart.timeScale().setVisibleLogicalRange(rangeRef.current);
+    else
+      chart.timeScale().setVisibleLogicalRange({
+        from: Math.max(0, dataRef.current.length - 100),
+        to: dataRef.current.length + 4,
+      });
+    const observer = new ResizeObserver(drawZones);
+    observer.observe(container.current);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(drawZones);
+    chart.subscribeCrosshairMove(drawZones);
+    const frame = requestAnimationFrame(drawZones);
+    return () => {
+      rangeRef.current = chart.timeScale().getVisibleLogicalRange();
+      updateRef.current = null;
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+      chart.remove();
+    };
+  }, [
+    indicators,
+    signals,
+    settings.emaFast,
+    settings.emaSlow,
+    settings.rsiPeriod,
+    settings.swing,
+  ]);
+  useEffect(() => {
+    updateRef.current?.(candles);
+  }, [candles]);
+  return (
+    <div className="market-chart-container">
+      <div
+        ref={container}
+        className="market-chart"
+        aria-label="Chart candlestick interaktif"
+      />
+      <canvas className="smc-overlay" ref={overlay} aria-hidden="true" />
+    </div>
+  );
+}

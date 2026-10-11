@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS derivatives (symbol TEXT NOT NULL, at INTEGER NOT NULL, source TEXT NOT NULL, funding REAL NOT NULL, open_interest REAL NOT NULL, oi_change REAL, is_proxy INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(symbol,at));

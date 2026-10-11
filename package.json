@@ -1,0 +1,52 @@
+{
+  "name": "kantor-trading",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@11.25.0",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "dev:api": "wrangler dev --port 8787",
+    "dev:api:proxy": "node scripts/dev-proxy.mjs",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "db:migrate": "wrangler d1 migrations apply kantor-db --local",
+    "deploy": "pnpm build && wrangler deploy",
+    "format": "prettier --write apps packages scripts package.json tsconfig.json vite.config.ts wrangler.jsonc pnpm-workspace.yaml .github README.md docs",
+    "format:check": "prettier --check apps packages scripts package.json tsconfig.json vite.config.ts wrangler.jsonc pnpm-workspace.yaml .github README.md docs"
+  },
+  "dependencies": {
+    "@fontsource/dm-sans": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.5.0",
+    "hono": "^4.11.4",
+    "lightweight-charts": "^5.1.0",
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.12.0",
+    "three": "^0.182.0",
+    "zod": "^3.25.76",
+    "zustand": "^5.0.10"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261010.1",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "@types/three": "^0.182.0",
+    "@vitejs/plugin-react": "^4.7.0",
+    "esbuild": "0.28.2",
+    "https-proxy-agent": "7.0.6",
+    "miniflare": "5.20261006.1-alpha",
+    "prettier": "^3.9.10",
+    "proxy-from-env": "1.1.0",
+    "typescript": "^5.9.3",
+    "undici": "7.29.1",
+    "vite": "^6.4.1",
+    "vitest": "^3.2.4",
+    "wrangler": "^4.59.2",
+    "ws": "8.21.0"
+  }
+}
