@@ -18,7 +18,7 @@ Kode adalah fondasi MVP yang berjalan lokal; matriks ini memisahkan fitur lokal 
 | Alert          | Harga, sinyal, cooldown, one-shot price crossing, D1 outbox/retry/dedup, edit level lewat API privat dengan validasi dan penolakan alert terpicu/nonaktif                 | Bukan Cloudflare Queue binding; alert volatilitas/rejection/failover dan pengiriman channel nyata belum diuji                                                                     |
 | Bahasa         | Navigasi/label utama ID/EN, prompt AI sesuai settings                                                                                                                     | Sebagian teks panel/detail masih Indonesia; Discord teks awal masih Indonesia                                                                                                     |
 | Performa       | Lazy scene/chart/routes, Auto berdasarkan FPS/device, DPR dibatasi, Low mempertahankan lantai 2/staf inti, fallback 2D, pause tab tersembunyi, reduced motion, font lokal | Target 30 FPS HP/5 detik 4G belum diukur pada perangkat/jaringan nyata; Chromium cloud memakai GPU software                                                                       |
-| Operasional    | Migrasi D1, setup/start scripts, runner Worker melalui proxy cloud, unit tests, browser smoke dan probe stream live terisolasi                                            | Belum deploy, DNS, live credentials emas/AI, pemantauan produksi, atau lisensi data                                                                                               |
+| Operasional    | Migrasi D1, setup/start scripts, runner Worker melalui proxy cloud, unit tests, browser smoke, pipeline CI/CD staging/production dan probe stream live terisolasi         | Pipeline memerlukan secrets/variables GitHub; belum deploy nyata, DNS, live credentials emas/AI, pemantauan produksi, atau lisensi data                                           |
 
 ## Kebijakan implementasi sementara
 
@@ -26,9 +26,10 @@ Bagian 21 PRD belum final. Aplikasi tidak memilih angka TTL atau margin tie-brea
 
 ## Pengujian dalam sesi implementasi
 
-- Build TypeScript/Vite produksi dan 147 tes otomatis lulus; enam tes jaringan opsional dilewati pada suite default dan lulus saat dijalankan terpisah pada sesi implementasi awal.
+- Build TypeScript/Vite produksi dan 161 tes otomatis lulus; enam tes jaringan opsional dilewati pada suite default dan lulus saat dijalankan terpisah pada sesi implementasi awal.
 - Tes engine, crypto, structure, upstream state machine, timeline presentasi/waiting, jalur tangga/rutinitas, kebijakan FPS, validasi payload, reconnect, dan broadcast privat/publik.
 - Edit alert: 16 kasus API/pemicuan dengan middleware asli dan SQLite in-memory dari migrasi, serta 5 kasus state untuk demo, kegagalan server, logout/perpindahan demo, dan penghapusan selama save. Uji API memeriksa otorisasi/origin, validasi, persistensi, serta kondisi update atomik yang mempertahankan status one-shot. Feed hanya memicu level yang masih sama dengan saat dibaca; tick dengan level lama setelah edit/hapus/nonaktif tidak memicu pengiriman.
+- CI/CD: 14 kasus generator untuk target, nama, path, D1, mode demo, dan metadata credential; workflow diperiksa dengan actionlint. Runner CI browser diuji terhadap D1 sementara, dan packaging konfigurasi staging/production diperiksa lewat Wrangler dry run. Eksekusi GitHub Actions dan deployment account Cloudflare perlu diverifikasi setelah workflow digabung dan kredensial target dikonfigurasi.
 - Smoke alert Chromium: edit numerik, harga invalid, drag dengan konfirmasi/batal, keyboard, perubahan indikator, isolasi BTC/emas, label ID/EN, hapus garis, demo tanpa write API, serta drag sentuhan viewport 390 px tanpa overflow.
 - D1 lokal: migrasi, auth/session revoke, settings/audit persistence, validasi, credential write-only, alert CRUD, origin rejection.
 - Chromium desktop dan mobile 390 px: routes dan interaksi utama, WebGL scene, chart, tanpa overflow atau error JavaScript setelah perbaikan label sprite.

@@ -91,7 +91,7 @@ python tests/alert_smoke.py
 
 Jalankan kedua server sebelum smoke browser. Screenshot disimpan di `test-results/`, yang diabaikan Git. Tes browser memeriksa privasi publik, perpindahan lantai, karakter, chart/indikator, alert, filter, detail sinyal/meeting, pengaturan, bahasa, dan responsivitas 390 px. Smoke alert memeriksa edit numerik, validasi harga, drag desktop/sentuhan ponsel, batal/konfirmasi, keyboard, isolasi aset, dan bahwa demo tidak mengirim perubahan ke API privat.
 
-147 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
+161 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
 
 Alert aktif yang belum terpicu ditampilkan sebagai garis pada chart. Geser pegangan garis untuk memilih level baru lalu konfirmasikan di formulir, atau gunakan tombol **Ubah alert** untuk mengisi harga langsung. Enter/Space pada pegangan membuka editor yang sama. Menutup formulir mempertahankan level tersimpan. Alert terpicu/nonaktif tidak bisa diedit atau diaktifkan ulang melalui perubahan harga; buat alert baru bila diperlukan. Mode demo hanya mengubah state sesi lokal, sedangkan workspace privat menyimpan perubahan di D1.
 
@@ -104,6 +104,8 @@ NODE_USE_ENV_PROXY=1 KANTOR_LIVE_SMOKE=1 pnpm exec vitest run apps/api/src/marke
 Worker live juga diperiksa dengan konfigurasi dan database sementara terpisah, tanpa key AI, cron, atau Discord: tick BTC melalui stream Bybit cadangan tersimpan di D1, dan event publik tidak memuat harga. `pnpm dev:api` biasa gagal melakukan DNS outbound di sandbox ini; runner proxy memperbaiki jalur koneksi tersebut. Keberhasilan ini belum membuktikan pemulihan primary di akun produksi. **Emas/AI dengan akun nyata, histori setahun, Cloudflare remote, latency, lisensi data, FPS HP, dan uptime belum terverifikasi**. Lihat [status implementasi](docs/IMPLEMENTATION.md) untuk cakupan yang tersisa.
 
 ## Deployment Cloudflare
+
+Pipeline GitHub Actions untuk CI, smoke browser, dan deployment staging/produksi dijelaskan di [panduan CI/CD](docs/CI_CD.md). CD membutuhkan konfigurasi GitHub Environments dan repository variable `CLOUDFLARE_DEPLOY_ENABLED=true`; production dipicu manual. Kedua target mulai dalam mode demo.
 
 Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 
