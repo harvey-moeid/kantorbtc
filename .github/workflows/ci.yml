@@ -110,11 +110,11 @@ jobs:
     env:
       DEPLOY_ENVIRONMENT: ${{ inputs.environment || 'staging' }}
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
-      CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID }}
-      CLOUDFLARE_D1_DATABASE_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME }}
-      CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME }}
-      CLOUDFLARE_HEALTH_URL: ${{ vars.CLOUDFLARE_HEALTH_URL }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID || (inputs.environment == 'production' && '07086b4d368d0a37ebcbbf186e51eecf') || '' }}
+      CLOUDFLARE_D1_DATABASE_ID: ${{ vars.CLOUDFLARE_D1_DATABASE_ID || (inputs.environment == 'production' && '0425ea85-00a2-4ee2-93db-ad76c487978e') || '' }}
+      CLOUDFLARE_D1_DATABASE_NAME: ${{ vars.CLOUDFLARE_D1_DATABASE_NAME || (inputs.environment == 'production' && 'kantor-db') || '' }}
+      CLOUDFLARE_WORKER_NAME: ${{ vars.CLOUDFLARE_WORKER_NAME || (inputs.environment == 'production' && 'kantor-trading') || '' }}
+      CLOUDFLARE_HEALTH_URL: ${{ vars.CLOUDFLARE_HEALTH_URL || (inputs.environment == 'production' && 'https://kantor-trading.harveymoeid.workers.dev/api/health') || '' }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
