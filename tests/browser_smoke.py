@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 import json, os
 from pathlib import Path
 Path('test-results').mkdir(exist_ok=True)
@@ -28,7 +28,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='XAUUSD',exact=True).click()
  page.locator('.main-nav').get_by_role('link',name='Sinyal trading').click()
  page.get_by_role('button',name='XAUUSD',exact=True).click()
- assert page.locator('tbody tr').count()==1
+ expect(page.locator('tbody tr')).to_have_count(1)
  page.locator('tbody tr').first.click()
  assert page.locator('dialog').is_visible()
  page.locator('dialog').get_by_role('button',name='Tutup',exact=True).click()

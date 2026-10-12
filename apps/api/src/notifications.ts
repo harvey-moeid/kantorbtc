@@ -1,5 +1,20 @@
 import type { Env } from "./env";
 import { credential } from "./data";
+export async function claimPriceAlert(
+  env: Env,
+  id: string,
+  price: number,
+  at: number,
+): Promise<boolean> {
+  // A tick may have read the old level before a concurrent edit or deletion.
+  // Only the unchanged, active one-shot alert can be claimed for delivery.
+  const claimed = await env.DB.prepare(
+    "UPDATE alerts SET fired=1,last_sent_at=? WHERE id=? AND price=? AND enabled=1 AND fired=0 RETURNING id",
+  )
+    .bind(at, id, price)
+    .first<{ id: string }>();
+  return !!claimed;
+}
 export async function enqueue(env: Env, id: string, content: string) {
   const now = Date.now();
   await env.DB.prepare(

@@ -17,7 +17,7 @@ import type { Env } from "./env";
 import { settings, slots } from "./data";
 import { callSlot } from "./ai";
 import { marketCandles, marketQuote, persistCandles } from "./market";
-import { enqueue, flushOutbox } from "./notifications";
+import { claimPriceAlert, enqueue, flushOutbox } from "./notifications";
 import { backfillChunk, initialBackfill } from "./backfill";
 import { BtcFeed } from "./btc-feed";
 import { derivatives } from "./derivatives";
@@ -275,11 +275,8 @@ export class MarketHub {
         Math.max(previous.price, quote.price) >= alert.price &&
         quote.at - (alert.last_sent_at || 0) >= config.settings.cooldown * 1000
       ) {
-        await this.env.DB.prepare(
-          "UPDATE alerts SET fired=1,last_sent_at=? WHERE id=?",
-        )
-          .bind(quote.at, alert.id)
-          .run();
+        if (!(await claimPriceAlert(this.env, alert.id, alert.price, quote.at)))
+          continue;
         if (config.settings.discordPrices)
           await enqueue(
             this.env,

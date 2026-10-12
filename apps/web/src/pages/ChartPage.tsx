@@ -14,6 +14,7 @@ import {
   Bitcoin,
   Layers,
   Plus,
+  Pencil,
   Wifi,
   X,
   Zap,
@@ -45,6 +46,7 @@ export default function ChartPage() {
     [indicators, setIndicators] = useState(["EMA", "Volume", "Sinyal"]),
     [alertOpen, setAlertOpen] = useState(false),
     [alertPrice, setAlertPrice] = useState(""),
+    [editingAlert, setEditingAlert] = useState<string | null>(null),
     [placing, setPlacing] = useState(false),
     [saving, setSaving] = useState(false),
     alerts = useStore((s) => s.alerts),
@@ -104,17 +106,33 @@ export default function ChartPage() {
     },
     [placing],
   );
+  const symbolAlerts = useMemo(
+    () => alerts.filter((alert) => alert.symbol === symbol),
+    [alerts, symbol],
+  );
+  const editAlert = useCallback((id: string, level: number) => {
+    setEditingAlert(id);
+    setAlertPrice(String(level));
+    setPlacing(false);
+    setAlertOpen(true);
+  }, []);
+  useEffect(() => {
+    setAlertOpen(false);
+    setEditingAlert(null);
+    setPlacing(false);
+  }, [symbol, demo]);
   if (!symbols.includes(symbol))
     return <Navigate to="/chart/btcusdt" replace />;
   const add = async () => {
     const p = Number(alertPrice);
     if (!Number.isFinite(p) || p <= 0) {
-      useStore.getState().notify("Masukkan harga yang valid.");
+      useStore.getState().notify(t.alertInvalidPrice);
       return;
     }
     setSaving(true);
     try {
-      await useStore.getState().addAlert({ symbol, price: p });
+      if (editingAlert) await useStore.getState().updateAlert(editingAlert, p);
+      else await useStore.getState().addAlert({ symbol, price: p });
       setAlertOpen(false);
     } catch (e) {
       useStore.getState().notify((e as Error).message);
@@ -203,16 +221,19 @@ export default function ChartPage() {
           </div>
           <button
             className={`button secondary small ${placing ? "active" : ""}`}
-            onClick={() => setPlacing(!placing)}
+            onClick={() => {
+              setEditingAlert(null);
+              setPlacing(!placing);
+            }}
           >
-            <Plus size={14} /> Alert harga
+            <Plus size={14} /> {t.priceAlerts}
           </button>
         </div>
         {placing && (
           <div className="info-strip">
-            Klik chart untuk memilih harga alert.{" "}
+            {t.alertPlaceNote}{" "}
             <button className="text-button" onClick={() => setPlacing(false)}>
-              Batal
+              {t.cancel}
             </button>
           </div>
         )}
@@ -229,6 +250,8 @@ export default function ChartPage() {
               indicators={indicators}
               signals={chosen}
               onPrice={onPrice}
+              alerts={symbolAlerts}
+              onAlertEdit={editAlert}
             />
           </Suspense>
         ) : (
@@ -260,39 +283,55 @@ export default function ChartPage() {
           <div className="panel-heading">
             <div>
               <Bell size={16} />
-              <h2>Alert harga</h2>
+              <h2>{t.priceAlerts}</h2>
             </div>
             <button
               className="icon-button"
-              aria-label="Tambah alert"
+              aria-label={t.addAlert}
               onClick={() => {
                 setAlertPrice(String(quote?.price || ""));
+                setEditingAlert(null);
+                setPlacing(false);
                 setAlertOpen(true);
               }}
             >
               <Plus size={17} />
             </button>
           </div>
-          {alerts.filter((a) => a.symbol === symbol).length ? (
-            alerts
-              .filter((a) => a.symbol === symbol)
-              .map((a) => (
+          {symbolAlerts.length ? (
+            <>
+              <p className="alert-help muted">{t.alertDragNote}</p>
+              {symbolAlerts.map((a) => (
                 <div className="alert-row" key={a.id}>
                   <Bell size={16} />
                   <b>${price(a.price)}</b>
                   <Badge>
-                    {a.fired ? "TERPICU" : a.enabled ? "AKTIF" : "NONAKTIF"}
+                    {a.fired
+                      ? t.alertFired
+                      : a.enabled
+                        ? t.alertActive
+                        : t.alertDisabled}
                   </Badge>
                   <button
                     className="icon-button"
-                    aria-label="Hapus alert"
+                    aria-label={t.editAlert}
+                    disabled={saving || !a.enabled || !!a.fired}
+                    onClick={() => editAlert(a.id, a.price)}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label={t.deleteAlert}
                     onClick={async () => {
                       try {
                         if (!demo)
                           await api(`/alerts/${a.id}`, { method: "DELETE" });
-                        useStore
-                          .getState()
-                          .set({ alerts: alerts.filter((v) => v.id !== a.id) });
+                        useStore.getState().set({
+                          alerts: useStore
+                            .getState()
+                            .alerts.filter((v) => v.id !== a.id),
+                        });
                       } catch (e) {
                         useStore.getState().notify((e as Error).message);
                       }
@@ -301,7 +340,8 @@ export default function ChartPage() {
                     <X size={15} />
                   </button>
                 </div>
-              ))
+              ))}
+            </>
           ) : (
             <div className="empty-state">
               <Bell size={22} />
@@ -316,12 +356,17 @@ export default function ChartPage() {
         </section>
       </div>
       {alertOpen && (
-        <Modal title="Buat alert harga" onClose={() => setAlertOpen(false)}>
+        <Modal
+          title={editingAlert ? t.editPriceAlert : t.createPriceAlert}
+          onClose={() => {
+            if (!saving) setAlertOpen(false);
+          }}
+        >
           <p className="muted">
-            {symbol} · sentuhan level berdasarkan tick, bukan order
+            {symbol} · {t.alertTickNote}
           </p>
           <label className="form-field">
-            Level harga
+            {t.alertPrice}
             <input
               type="number"
               min="0.01"
@@ -336,7 +381,11 @@ export default function ChartPage() {
             disabled={saving}
             onClick={add}
           >
-            {saving ? "Menyimpan…" : "Buat alert"}
+            {saving
+              ? t.alertSaving
+              : editingAlert
+                ? t.saveAlert
+                : t.createAlert}
           </button>
         </Modal>
       )}

@@ -1841,6 +1841,38 @@ h1 {
 .alert-row > button {
   margin-left: auto;
 }
+.alert-row > button + button {
+  margin-left: 0;
+}
+.alert-help {
+  padding: 0 18px;
+  font-size: 11px;
+}
+.alert-line-handle {
+  position: absolute;
+  z-index: 2;
+  transform: translateY(-50%);
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid #e4ba75;
+  border-radius: 4px;
+  background: #332b1b;
+  color: #f0d49f;
+  font: inherit;
+  font-size: 10px;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+.alert-line-handle:focus-visible {
+  outline: 2px solid #f0d49f;
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  .alert-line-handle {
+    min-height: 44px;
+  }
+}
 .settings-layout {
   display: grid;
   grid-template-columns: 215px minmax(0, 1fr);

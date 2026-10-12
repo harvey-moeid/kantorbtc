@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createChart,
   CandlestickSeries,
@@ -6,6 +6,7 @@ import {
   LineSeries,
   ColorType,
   type LogicalRange,
+  type IPriceLine,
   type UTCTimestamp,
 } from "lightweight-charts";
 import type { Candle, Signal } from "../../../../packages/shared/src/domain";
@@ -17,17 +18,22 @@ import {
   atr,
 } from "../../../../packages/shared/src/engine";
 import { structure } from "../../../../packages/shared/src/structure";
-import { useStore } from "../store";
+import { useStore, type PriceAlert } from "../store";
+import { price, useT } from "../i18n";
 export default function MarketChart({
   candles,
   indicators,
   signals,
   onPrice,
+  alerts = [],
+  onAlertEdit,
 }: {
   candles: Candle[];
   indicators: string[];
   signals: Signal[];
   onPrice?: (price: number) => void;
+  alerts?: PriceAlert[];
+  onAlertEdit?: (id: string, price: number) => void;
 }) {
   const container = useRef<HTMLDivElement>(null),
     overlay = useRef<HTMLCanvasElement>(null),
@@ -35,9 +41,23 @@ export default function MarketChart({
     dataRef = useRef(candles),
     priceCallback = useRef(onPrice),
     updateRef = useRef<((candles: Candle[]) => void) | null>(null),
-    rangeRef = useRef<LogicalRange | null>(null);
+    rangeRef = useRef<LogicalRange | null>(null),
+    alertRef = useRef(alerts),
+    editCallback = useRef(onAlertEdit),
+    updateAlertsRef = useRef<(() => void) | null>(null),
+    dragHandlers = useRef<{
+      start: (id: string) => void;
+      move: (clientY: number) => void;
+      finish: (cancel: boolean) => void;
+    } | null>(null),
+    [handles, setHandles] = useState<
+      { id: string; top: number; right: number; price: number }[]
+    >([]),
+    t = useT();
   dataRef.current = candles;
   priceCallback.current = onPrice;
+  alertRef.current = alerts;
+  editCallback.current = onAlertEdit;
   useEffect(() => {
     if (!container.current) return;
     const chart = createChart(container.current, {
@@ -83,6 +103,8 @@ export default function MarketChart({
       wickDownColor: "#d08673",
       borderVisible: false,
     });
+    const alertLines = new Map<string, IPriceLine>();
+    let drag: { id: string; price: number } | null = null;
     addUpdate((data) =>
       candleSeries.setData(
         data.map((c) => ({ ...c, time: c.time as UTCTimestamp })),
@@ -263,7 +285,7 @@ export default function MarketChart({
           );
         });
     chart.subscribeClick((event) => {
-      if (event.point) {
+      if (event.point && event.paneIndex === 0) {
         const p = candleSeries.coordinateToPrice(event.point.y);
         if (p !== null) priceCallback.current?.(p);
       }
@@ -278,8 +300,40 @@ export default function MarketChart({
       canvas.height = height * ratio;
       const ctx = canvas.getContext("2d")!;
       ctx.scale(ratio, ratio);
-      if (!indicators.includes("SMC")) return;
-      for (const z of structure(dataRef.current, settings.swing).zones) {
+      const paneHeight = chart.panes()[0].getHeight();
+      const nextHandles = alertRef.current
+        .filter((alert) => alert.enabled && !alert.fired)
+        .flatMap((alert) => {
+          const level = drag?.id === alert.id ? drag.price : alert.price;
+          const y = candleSeries.priceToCoordinate(level);
+          return y === null || y < 14 || y > paneHeight - 14
+            ? []
+            : [
+                {
+                  id: alert.id,
+                  top: y,
+                  right: chart.priceScale("right").width() + 8,
+                  price: level,
+                },
+              ];
+        });
+      setHandles((previous) =>
+        previous.length === nextHandles.length &&
+        previous.every((handle, index) => {
+          const next = nextHandles[index];
+          return (
+            handle.id === next.id &&
+            handle.top === next.top &&
+            handle.right === next.right &&
+            handle.price === next.price
+          );
+        })
+          ? previous
+          : nextHandles,
+      );
+      for (const z of indicators.includes("SMC")
+        ? structure(dataRef.current, settings.swing).zones
+        : []) {
         const a = candleSeries.priceToCoordinate(z.high),
           b = candleSeries.priceToCoordinate(z.low),
           x = chart.timeScale().timeToCoordinate(z.from as UTCTimestamp);
@@ -295,6 +349,64 @@ export default function MarketChart({
         ctx.fillStyle = "#a4b396";
         ctx.fillText(z.type, left + 5, a + 13);
       }
+    };
+    updateAlertsRef.current = () => {
+      drag = null;
+      for (const line of alertLines.values())
+        candleSeries.removePriceLine(line);
+      alertLines.clear();
+      for (const alert of alertRef.current.filter(
+        (a) => a.enabled && !a.fired,
+      )) {
+        alertLines.set(
+          alert.id,
+          candleSeries.createPriceLine({
+            price: alert.price,
+            color: "#e4ba75",
+            lineWidth: 1,
+            lineStyle: 2,
+            axisLabelVisible: true,
+            title: "ALERT",
+          }),
+        );
+      }
+      drawZones();
+    };
+    dragHandlers.current = {
+      start: (id) => {
+        const alert = alertRef.current.find(
+          (a) => a.id === id && a.enabled && !a.fired,
+        );
+        if (alert) drag = { id, price: alert.price };
+      },
+      move: (clientY) => {
+        if (!drag || !container.current) return;
+        const y = Math.max(
+          22,
+          Math.min(
+            chart.panes()[0].getHeight() - 22,
+            clientY - container.current.getBoundingClientRect().top,
+          ),
+        );
+        const level = candleSeries.coordinateToPrice(y);
+        if (level === null || !Number.isFinite(level) || level <= 0) return;
+        const rounded = Math.round(level * 100) / 100;
+        if (rounded <= 0) return;
+        drag.price = rounded;
+        alertLines.get(drag.id)?.applyOptions({ price: drag.price });
+        drawZones();
+      },
+      finish: (cancel) => {
+        if (!drag) return;
+        const selected = drag;
+        drag = null;
+        const original = alertRef.current.find((a) => a.id === selected.id);
+        if (original)
+          alertLines.get(selected.id)?.applyOptions({ price: original.price });
+        drawZones();
+        if (!cancel && original?.enabled && !original.fired)
+          editCallback.current?.(selected.id, selected.price);
+      },
     };
     updateRef.current = (data) => {
       for (const update of updaters) update(data);
@@ -312,9 +424,12 @@ export default function MarketChart({
     chart.timeScale().subscribeVisibleLogicalRangeChange(drawZones);
     chart.subscribeCrosshairMove(drawZones);
     const frame = requestAnimationFrame(drawZones);
+    updateAlertsRef.current();
     return () => {
       rangeRef.current = chart.timeScale().getVisibleLogicalRange();
       updateRef.current = null;
+      updateAlertsRef.current = null;
+      dragHandlers.current = null;
       cancelAnimationFrame(frame);
       observer.disconnect();
       chart.remove();
@@ -330,14 +445,48 @@ export default function MarketChart({
   useEffect(() => {
     updateRef.current?.(candles);
   }, [candles]);
+  useEffect(() => {
+    updateAlertsRef.current?.();
+  }, [alerts]);
   return (
     <div className="market-chart-container">
-      <div
-        ref={container}
-        className="market-chart"
-        aria-label="Chart candlestick interaktif"
-      />
+      <div ref={container} className="market-chart" aria-label={t.chartLabel} />
       <canvas className="smc-overlay" ref={overlay} aria-hidden="true" />
+      {handles.map((handle) => (
+        <button
+          key={handle.id}
+          className="alert-line-handle"
+          data-alert-id={handle.id}
+          style={{ top: handle.top, right: handle.right }}
+          aria-label={`${t.editAlert} ${price(handle.price)}`}
+          title={t.alertDragNote}
+          onPointerDown={(event) => {
+            if (event.button !== 0) return;
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.setPointerCapture(event.pointerId);
+            dragHandlers.current?.start(handle.id);
+          }}
+          onPointerMove={(event) => {
+            if (event.currentTarget.hasPointerCapture(event.pointerId))
+              dragHandlers.current?.move(event.clientY);
+          }}
+          onPointerUp={(event) => {
+            if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+            dragHandlers.current?.finish(false);
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }}
+          onPointerCancel={() => dragHandlers.current?.finish(true)}
+          onLostPointerCapture={() => dragHandlers.current?.finish(true)}
+          onClick={(event) => {
+            // Keyboard and assistive activation open the same numeric editor.
+            if (event.detail === 0)
+              editCallback.current?.(handle.id, handle.price);
+          }}
+        >
+          ↕ {price(handle.price)}
+        </button>
+      ))}
     </div>
   );
 }

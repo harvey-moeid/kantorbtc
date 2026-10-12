@@ -43,6 +43,7 @@ interface State {
   notify: (text: string) => void;
   saveSettings: (s: Settings) => Promise<void>;
   addAlert: (a: Omit<PriceAlert, "id" | "enabled">) => Promise<void>;
+  updateAlert: (id: string, price: number) => Promise<void>;
 }
 export class ApiError extends Error {
   constructor(
@@ -146,6 +147,31 @@ export const useStore = create<State>()(
           get().demo
             ? "Alert demo dibuat. Pengiriman Discord tidak aktif dalam demo."
             : "Alert harga dibuat.",
+        );
+      },
+      updateAlert: async (id, price) => {
+        const existing = get().alerts.find((alert) => alert.id === id);
+        if (!existing || !existing.enabled || existing.fired)
+          throw new Error("Alert terpicu atau nonaktif tidak dapat diubah.");
+        if (!Number.isFinite(price) || price <= 0)
+          throw new Error("Masukkan harga yang valid.");
+        const demo = get().demo;
+        const alert = demo
+          ? { ...existing, price }
+          : await api<PriceAlert>(`/alerts/${encodeURIComponent(id)}`, {
+              method: "PATCH",
+              body: JSON.stringify({ price }),
+            });
+        // A pending private request must not restore alerts after logout or
+        // overwrite the state of a newly entered demo.
+        if (get().demo !== demo || (!demo && !get().authenticated)) return;
+        set((s) => ({
+          alerts: s.alerts.map((item) => (item.id === id ? alert : item)),
+        }));
+        get().notify(
+          get().settings.language === "en"
+            ? "Price alert updated."
+            : "Alert harga diperbarui.",
         );
       },
     }),

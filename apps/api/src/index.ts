@@ -404,6 +404,33 @@ app.delete("/api/alerts/:id", async (c) => {
     .run();
   return c.json({ ok: true });
 });
+app.patch("/api/alerts/:id", async (c) => {
+  const parsed = z
+    .object({ price: z.number().positive().finite() })
+    .strict()
+    .safeParse(await c.req.json());
+  if (!parsed.success)
+    return c.json({ error: "Harga alert tidak valid." }, 400);
+  // Keep one-shot alerts one-shot: editing must not rearm an alert that fired
+  // while the form was open. The condition and update are atomic in D1.
+  const alert = await c.env.DB.prepare(
+    "UPDATE alerts SET price=? WHERE id=? AND enabled=1 AND fired=0 RETURNING id,symbol,price,enabled,fired",
+  )
+    .bind(parsed.data.price, c.req.param("id"))
+    .first();
+  if (!alert) {
+    const existing = await c.env.DB.prepare("SELECT id FROM alerts WHERE id=?")
+      .bind(c.req.param("id"))
+      .first();
+    return existing
+      ? c.json(
+          { error: "Alert terpicu atau nonaktif tidak dapat diubah." },
+          409,
+        )
+      : c.json({ error: "Alert tidak ditemukan." }, 404);
+  }
+  return c.json({ ...alert, enabled: true, fired: false });
+});
 app.get("/api/audit", async (c) => {
   const settings = await c.env.DB.prepare(
     "SELECT id,category,version,at FROM settings_audit ORDER BY at DESC LIMIT 100",
