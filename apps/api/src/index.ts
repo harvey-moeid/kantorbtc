@@ -1,9 +1,12 @@
+import { cotContext, refreshCot } from "./cot";
+import { aiSettingsSchema } from "../../../packages/shared/src/ai-config";
 import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import { bodyLimit } from "hono/body-limit";
 import { z } from "zod";
 import {
   settingsSchema,
+  seconds,
   symbols,
   timeframes,
   type Candle,
@@ -208,19 +211,19 @@ app.get("/api/market/:symbol/candles", async (c) => {
     return c.json({ error: "Aset, timeframe, atau limit tidak valid." }, 400);
   const { symbol, tf, limit } = parsed.data;
   let rows = await c.env.DB.prepare(
-    "SELECT time,open,high,low,close,volume FROM candles WHERE symbol=? AND tf=? ORDER BY time DESC LIMIT ?",
+    "SELECT time,open,high,low,close,volume,source FROM candles WHERE symbol=? AND tf=? ORDER BY time DESC LIMIT ?",
   )
     .bind(symbol, tf, limit)
-    .all<Candle>();
+    .all<Candle & { source: string }>();
   if (rows.results.length < 50 && c.env.APP_MODE === "live") {
     try {
       const fresh = await marketCandles(c.env, symbol, tf);
       await persistCandles(c.env, symbol, tf, fresh);
       rows = await c.env.DB.prepare(
-        "SELECT time,open,high,low,close,volume FROM candles WHERE symbol=? AND tf=? ORDER BY time DESC LIMIT ?",
+        "SELECT time,open,high,low,close,volume,source FROM candles WHERE symbol=? AND tf=? ORDER BY time DESC LIMIT ?",
       )
         .bind(symbol, tf, limit)
-        .all<Candle>();
+        .all<Candle & { source: string }>();
     } catch {
       return c.json(
         {
@@ -231,8 +234,37 @@ app.get("/api/market/:symbol/candles", async (c) => {
       );
     }
   }
-  return c.json({ candles: rows.results.reverse() });
+  const candles = rows.results.reverse();
+  const recovery = await c.env.DB.prepare(
+    "SELECT count(*) AS count FROM backfill_jobs WHERE symbol=? AND tf=? AND kind='recovery' AND status IN ('pending','failed')",
+  )
+    .bind(symbol, tf)
+    .first<{ count: number }>();
+  return c.json({
+    candles,
+    health: {
+      sources: [...new Set(candles.map((row) => row.source))],
+      lastClosedAt: candles.at(-1)?.time ?? null,
+      gapCount:
+        symbol === "BTCUSDT"
+          ? candles.reduce(
+              (sum, c, i) =>
+                sum +
+                (i
+                  ? Math.max(
+                      0,
+                      Math.floor((c.time - candles[i - 1].time) / seconds[tf]) -
+                        1,
+                    )
+                  : 0),
+              0,
+            )
+          : null,
+      recoveryJobs: recovery?.count ?? 0,
+    },
+  });
 });
+app.get("/api/market/XAUUSD/cot", async (c) => c.json(await cotContext(c.env)));
 app.get("/api/market/:symbol/derivatives", async (c) => {
   const symbol = c.req.param("symbol").toUpperCase();
   if (!symbols.includes(symbol as (typeof symbols)[number]))
@@ -267,6 +299,67 @@ app.get("/api/signals/:id", async (c) => {
     ? c.json({ signal: JSON.parse(row.value_json) })
     : c.json({ error: "Sinyal tidak ditemukan." }, 404);
 });
+app.get("/api/signals/:id/events", async (c) => {
+  const parsed = z
+    .object({
+      id: z
+        .string()
+        .min(1)
+        .max(100)
+        .regex(/^[A-Za-z0-9_-]+$/),
+      limit: z.coerce.number().int().min(1).max(200),
+      cursorAt: z.coerce.number().int().min(0).optional(),
+      cursorId: z
+        .string()
+        .min(1)
+        .max(200)
+        .regex(/^[A-Za-z0-9_-]+$/)
+        .optional(),
+    })
+    .refine(
+      (value) =>
+        (value.cursorAt === undefined) === (value.cursorId === undefined),
+    )
+    .safeParse({
+      id: c.req.param("id"),
+      limit: c.req.query("limit") ?? 50,
+      cursorAt: c.req.query("cursorAt"),
+      cursorId: c.req.query("cursorId"),
+    });
+  if (!parsed.success)
+    return c.json({ error: "ID, limit, atau cursor audit tidak valid." }, 400);
+  const { id, limit, cursorAt, cursorId } = parsed.data;
+  if (
+    !(await c.env.DB.prepare("SELECT id FROM signals WHERE id=?")
+      .bind(id)
+      .first())
+  )
+    return c.json({ error: "Sinyal tidak ditemukan." }, 404);
+  const query = c.env.DB.prepare(
+    `SELECT id,kind,price,at,value_json FROM signal_events WHERE signal_id=?${cursorAt !== undefined ? " AND (at<? OR (at=? AND id<?))" : ""} ORDER BY at DESC,id DESC LIMIT ?`,
+  );
+  const { results } = await (
+    cursorAt !== undefined
+      ? query.bind(id, cursorAt, cursorAt, cursorId!, limit + 1)
+      : query.bind(id, limit + 1)
+  ).all<{
+    id: string;
+    kind: string;
+    price: number | null;
+    at: number;
+    value_json: string;
+  }>();
+  const page = results.slice(0, limit),
+    last = page.at(-1);
+  return c.json({
+    events: page.map(({ value_json, ...event }) => ({
+      ...event,
+      details: JSON.parse(value_json),
+    })),
+    nextCursor:
+      results.length > limit && last ? { at: last.at, id: last.id } : null,
+  });
+});
 app.get("/api/meetings", async (c) => {
   const { results } = await c.env.DB.prepare(
     "SELECT value_json FROM meetings ORDER BY at DESC LIMIT 100",
@@ -288,27 +381,7 @@ app.put("/api/settings/scanner", async (c) => {
 });
 app.get("/api/settings/ai", async (c) => c.json({ slots: await slots(c.env) }));
 app.put("/api/settings/ai", async (c) => {
-  const parsed = z
-    .object({
-      slots: z
-        .array(
-          z.object({
-            provider: z.enum([
-              "Workers AI",
-              "Gemini",
-              "Groq",
-              "OpenRouter",
-              "Mistral",
-              "Hugging Face",
-              "Cohere",
-              "NVIDIA",
-            ]),
-            model: z.string().min(1).max(160),
-          }),
-        )
-        .length(4),
-    })
-    .safeParse(await c.req.json());
+  const parsed = aiSettingsSchema.safeParse(await c.req.json());
   if (!parsed.success)
     return c.json({ error: "Empat slot provider/model wajib valid." }, 400);
   await saveSettings(c.env, "ai", parsed.data.slots);
@@ -521,7 +594,12 @@ export default {
   async scheduled(_event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     if (env.APP_MODE !== "live") return;
     const hub = env.MARKET_HUB.get(env.MARKET_HUB.idFromName("office"));
-    ctx.waitUntil(hub.fetch("https://hub/scan", { method: "POST" }));
+    ctx.waitUntil(
+      (async () => {
+        await refreshCot(env);
+        await hub.fetch("https://hub/scan", { method: "POST" });
+      })(),
+    );
   },
 };
 export { app, defaultSlots };

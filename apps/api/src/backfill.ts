@@ -1,3 +1,4 @@
+import { recordCandleAmbiguities } from "./signal-ambiguity";
 import {
   symbols,
   timeframes,
@@ -17,18 +18,20 @@ export interface BackfillJob {
   rows_saved: number;
   error: string | null;
   updated_at: number;
+  kind: "initial" | "manual" | "recovery";
 }
 export async function createBackfill(
   env: Env,
   symbol: Symbol,
   from: number,
   to: number,
+  kind: BackfillJob["kind"] = "manual",
 ) {
   await env.DB.batch(
     timeframes.map((tf) =>
       env.DB.prepare(
-        "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES(?,?,?,?,?,?,?)",
-      ).bind(crypto.randomUUID(), symbol, tf, from, to, to, Date.now()),
+        "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at,kind) VALUES(?,?,?,?,?,?,?,?)",
+      ).bind(crypto.randomUUID(), symbol, tf, from, to, to, Date.now(), kind),
     ),
   );
 }
@@ -38,17 +41,30 @@ export async function initialBackfill(env: Env) {
   ).first();
   if (initialized) return;
   const now = Math.floor(Date.now() / 1000);
-  for (const symbol of symbols)
-    await createBackfill(env, symbol, now - 31536000, now);
-  await env.DB.prepare(
-    "INSERT OR IGNORE INTO settings(id,value_json,version,updated_at) VALUES('backfill_initialized','true',1,?)",
-  )
-    .bind(Date.now())
-    .run();
+  await env.DB.batch([
+    ...symbols.flatMap((symbol) =>
+      timeframes.map((tf) =>
+        env.DB.prepare(
+          "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at,kind) SELECT ?,?,?,?,?,?,?,'initial' WHERE NOT EXISTS(SELECT 1 FROM settings WHERE id='backfill_initialized')",
+        ).bind(
+          crypto.randomUUID(),
+          symbol,
+          tf,
+          now - 31536000,
+          now,
+          now,
+          Date.now(),
+        ),
+      ),
+    ),
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO settings(id,value_json,version,updated_at) VALUES('backfill_initialized','true',1,?)",
+    ).bind(Date.now()),
+  ]);
 }
 export async function backfillChunk(env: Env) {
   const job = await env.DB.prepare(
-    "SELECT * FROM backfill_jobs WHERE status='pending' ORDER BY updated_at LIMIT 1",
+    "SELECT * FROM backfill_jobs WHERE status='pending' ORDER BY CASE WHEN kind='recovery' THEN 0 ELSE 1 END,updated_at LIMIT 1",
   ).first<BackfillJob>();
   if (!job) return;
   try {
@@ -64,6 +80,10 @@ export async function backfillChunk(env: Env) {
         ...data,
         candles: filtered,
       });
+    await recordCandleAmbiguities(env, job.symbol, job.tf, {
+      ...data,
+      candles: filtered,
+    });
     await env.DB.prepare(
       "UPDATE backfill_jobs SET cursor_time=?,rows_saved=rows_saved+?,status=?,error=NULL,updated_at=? WHERE id=?",
     )

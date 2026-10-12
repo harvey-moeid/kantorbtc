@@ -1,6 +1,6 @@
 # PRD — Kantor Trading 3D (BTCUSDT & XAUUSD)
 
-*Draf v2 · 11 Oktober 2026 · Status: finalisasi lewat tanya jawab, belum final, belum coding*
+_Draf v2 · 11 Oktober 2026 · Diperbarui 12 Oktober 2026: implementasi dilanjutkan; keputusan lanjutan pada 20.11–20.12 dikonfirmasi; rincian yang tersisa tercantum pada bagian 21._
 
 > **Aturan pembacaan dokumen:** Bagian **20 — Keputusan Terkonfirmasi** adalah revisi terbaru hasil tanya jawab dan **menggantikan ketentuan lama yang bertentangan** pada bagian 1–19. Teks awal dipertahankan sebagai jejak spesifikasi agar tidak ada keputusan atau detail lama yang hilang. Butir pada **bagian 21** belum diputuskan dan tidak boleh dianggap final.
 
@@ -43,24 +43,24 @@ Aplikasi web mobile-first yang menampilkan pasar **BTCUSDT** dan **XAUUSD** dala
 
 ## 4. Cakupan MVP
 
-| Area | Termasuk MVP |
-| --- | --- |
-| Data pasar | Harga realtime + candle 5m/15m/H1/H4/D1 untuk 2 aset |
-| Scanner | 4 kelompok (SMC/ICT, indikator, volume, derivatives) per timeframe, suara arah + skor |
-| Meeting AI | Meeting: voting 4 model AI saat ≥ 2 kelompok searah |
-| Kantor 3D | 1 scene kantor, 10+ karyawan, layar trading, kamera orbit |
-| Interaksi | Klik karyawan → analisis, klik layar → halaman chart sendiri |
-| Alert | Discord (webhook) |
-| Log | Riwayat sinyal dan analisis di D1 |
-| Performa | Kualitas adaptif (Low/Med/High) |
+| Area          | Termasuk MVP                                                                                     |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| Data pasar    | Harga realtime + candle 5m/15m/H1/H4/D1 untuk 2 aset                                             |
+| Scanner       | 4 kelompok (SMC/ICT, indikator, volume, derivatives) per timeframe, suara arah + skor            |
+| Meeting AI    | Meeting: voting 4 model AI saat ≥ 2 kelompok searah                                              |
+| Kantor 3D     | 1 scene kantor, 10+ karyawan, layar trading, kamera orbit                                        |
+| Interaksi     | Klik karyawan → analisis, klik layar → halaman chart sendiri                                     |
+| Alert         | Discord (webhook)                                                                                |
+| Log           | Riwayat sinyal dan analisis di D1                                                                |
+| Performa      | Kualitas adaptif (Low/Med/High)                                                                  |
 | Halaman chart | Halaman sendiri: candlestick realtime, indikator, zona SMC/ICT, penanda sinyal, alert dari chart |
 
 ## 5. Sumber Data dan Fallback
 
-| Aset | Utama | Fallback (urutan) |
-| --- | --- | --- |
-| BTCUSDT | OKX | Binance → Bybit |
-| XAUUSD | OANDA | Twelve Data |
+| Aset    | Utama | Fallback (urutan) |
+| ------- | ----- | ----------------- |
+| BTCUSDT | OKX   | Binance → Bybit   |
+| XAUUSD  | OANDA | Twelve Data       |
 
 **Data proxy emas untuk kelompok derivatives dan volume (rekomendasi):**
 
@@ -103,15 +103,15 @@ Exchange/Broker ──WS/REST──► Durable Object: MarketHub (1 per aset)
 Pages (React + R3F) ◄── Workers API (Hono) ◄── D1 / KV
 ```
 
-| Komponen | Fungsi |
-| --- | --- |
-| **Pages** | Frontend React + React Three Fiber |
-| **Workers (Hono)** | Auth, REST API, endpoint WebSocket klien |
-| **Durable Objects** | `MarketHub` per aset: pegang koneksi ke sumber data, failover, agregasi candle, broadcast ke klien. Satu koneksi upstream dibagi ke semua klien |
-| **D1** | User, candle historis, sinyal, analisis LLM, log, pengaturan alert |
-| **KV** | Cache ringan (konfigurasi, snapshot harga terakhir) |
-| **Provider AI (Workers AI, Gemini, Groq, OpenRouter, Mistral, Hugging Face, Cohere, NVIDIA)** | Voting 4 model di meeting |
-| **Cron / Queues** | Backfill candle, pembersihan log, antrean kirim Discord |
+| Komponen                                                                                      | Fungsi                                                                                                                                          |
+| --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Pages**                                                                                     | Frontend React + React Three Fiber                                                                                                              |
+| **Workers (Hono)**                                                                            | Auth, REST API, endpoint WebSocket klien                                                                                                        |
+| **Durable Objects**                                                                           | `MarketHub` per aset: pegang koneksi ke sumber data, failover, agregasi candle, broadcast ke klien. Satu koneksi upstream dibagi ke semua klien |
+| **D1**                                                                                        | User, candle historis, sinyal, analisis LLM, log, pengaturan alert                                                                              |
+| **KV**                                                                                        | Cache ringan (konfigurasi, snapshot harga terakhir)                                                                                             |
+| **Provider AI (Workers AI, Gemini, Groq, OpenRouter, Mistral, Hugging Face, Cohere, NVIDIA)** | Voting 4 model di meeting                                                                                                                       |
+| **Cron / Queues**                                                                             | Backfill candle, pembersihan log, antrean kirim Discord                                                                                         |
 
 **Rahasia** (API key OANDA, Twelve Data, webhook Discord, kunci LLM) disimpan terenkripsi di D1 dan bisa diedit lewat UI (rincian di bawah). Tidak pernah dikirim ke klien. Yang tetap berupa Worker secret hanya kunci enkripsi utama.
 
@@ -128,18 +128,18 @@ Pages (React + R3F) ◄── Workers API (Hono) ◄── D1 / KV
 
 ### 6.1 Stack Teknis (rekomendasi)
 
-| Area | Pilihan | Alasan |
-| --- | --- | --- |
-| Build dan routing | Vite + React + React Router (SPA) | App berat di sisi klien (3D, WebSocket), halaman utama di balik login, tidak butuh SSR. Build cepat dan sederhana |
-| 3D | React Three Fiber + drei | Sesuai keputusan. drei menyediakan loader GLB, kontrol kamera, dan helper performa |
-| State | Zustand | Ringan dan cocok dengan R3F untuk state yang sering berubah (harga, event meeting) |
-| Chart | Lightweight Charts | Ringan di HP |
-| Styling | Tailwind CSS (tema gelap saja) | Cepat dibuat, token warna konsisten, ukuran CSS akhir kecil |
-| i18n | react-i18next (Indonesia default, Inggris) | Dua bahasa, termasuk template bubble teks |
-| Backend | Hono di Workers + Durable Objects | Sesuai bagian 6 |
-| Validasi | Zod di package bersama | Memvalidasi JSON suara AI dan payload API, dipakai frontend dan backend |
-| Database | D1 + migrasi Wrangler | Sesuai bagian 6 |
-| Tooling | TypeScript, pnpm workspaces, Vitest | Vitest untuk uji indikator dan logika scanner |
+| Area              | Pilihan                                    | Alasan                                                                                                            |
+| ----------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| Build dan routing | Vite + React + React Router (SPA)          | App berat di sisi klien (3D, WebSocket), halaman utama di balik login, tidak butuh SSR. Build cepat dan sederhana |
+| 3D                | React Three Fiber + drei                   | Sesuai keputusan. drei menyediakan loader GLB, kontrol kamera, dan helper performa                                |
+| State             | Zustand                                    | Ringan dan cocok dengan R3F untuk state yang sering berubah (harga, event meeting)                                |
+| Chart             | Lightweight Charts                         | Ringan di HP                                                                                                      |
+| Styling           | Tailwind CSS (tema gelap saja)             | Cepat dibuat, token warna konsisten, ukuran CSS akhir kecil                                                       |
+| i18n              | react-i18next (Indonesia default, Inggris) | Dua bahasa, termasuk template bubble teks                                                                         |
+| Backend           | Hono di Workers + Durable Objects          | Sesuai bagian 6                                                                                                   |
+| Validasi          | Zod di package bersama                     | Memvalidasi JSON suara AI dan payload API, dipakai frontend dan backend                                           |
+| Database          | D1 + migrasi Wrangler                      | Sesuai bagian 6                                                                                                   |
+| Tooling           | TypeScript, pnpm workspaces, Vitest        | Vitest untuk uji indikator dan logika scanner                                                                     |
 
 **Struktur monorepo:**
 
@@ -163,12 +163,12 @@ Scanner membaca pasar lewat **4 kelompok analisis**. Tiap kelompok memberi satu 
 - **Meeting scanner (tiap 5 menit):** scanner berjalan terjadwal tiap 5 menit, sejajar dengan jam candle 5m (menit ke-0, 5, 10, dan seterusnya), lewat alarm Durable Object atau Cron Trigger. Hanya scanner, tanpa AI. Hasilnya tetap dicatat di log walau tidak ada sinyal.
 - **Meeting AI:** dibuka hanya bila syarat scanner terpenuhi pada putaran itu (minimal 2 kelompok searah). Rinciannya di bagian 8.
 
-| Kelompok | Isi (contoh) | Catatan data |
-| --- | --- | --- |
-| 1. SMC/ICT | Market structure (BOS/CHoCH), order block, fair value gap (FVG), liquidity sweep, zona premium/discount | Dihitung dari candle OHLC semua timeframe |
-| 2. Indikator | EMA, RSI, MACD, ATR, Bollinger Bands | Dihitung dari candle OHLC |
-| 3. Volume | Lonjakan volume, VWAP/volume profile, tekanan beli-jual bila tersedia | BTC: volume nyata dari exchange. XAUUSD: tick volume dari spot, ditambah volume perpetual XAUUSDT dari exchange crypto sebagai proxy |
-| 4. Derivatives | Funding rate, open interest, long/short ratio, likuidasi | BTC: tersedia dari OKX/Binance/Bybit. XAUUSD: tidak ada perpetual standar di OANDA, jadi memakai proxy perpetual XAUUSDT (funding, open interest) dari Binance/Bybit/OKX, ditambah COT mingguan sebagai konteks |
+| Kelompok       | Isi (contoh)                                                                                            | Catatan data                                                                                                                                                                                                    |
+| -------------- | ------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. SMC/ICT     | Market structure (BOS/CHoCH), order block, fair value gap (FVG), liquidity sweep, zona premium/discount | Dihitung dari candle OHLC semua timeframe                                                                                                                                                                       |
+| 2. Indikator   | EMA, RSI, MACD, ATR, Bollinger Bands                                                                    | Dihitung dari candle OHLC                                                                                                                                                                                       |
+| 3. Volume      | Lonjakan volume, VWAP/volume profile, tekanan beli-jual bila tersedia                                   | BTC: volume nyata dari exchange. XAUUSD: tick volume dari spot, ditambah volume perpetual XAUUSDT dari exchange crypto sebagai proxy                                                                            |
+| 4. Derivatives | Funding rate, open interest, long/short ratio, likuidasi                                                | BTC: tersedia dari OKX/Binance/Bybit. XAUUSD: tidak ada perpetual standar di OANDA, jadi memakai proxy perpetual XAUUSDT (funding, open interest) dari Binance/Bybit/OKX, ditambah COT mingguan sebagai konteks |
 
 **Output per kelompok:** `{symbol, tf, kelompok, arah, skor, bukti[]}`.
 
@@ -197,16 +197,16 @@ Saat syarat 2 kelompok searah terpenuhi, sistem membuka **meeting**: 4 model AI 
 
 **Provider yang didukung** (aktif per provider lewat konfigurasi, tiap API key disimpan sebagai Worker secret):
 
-| Provider | Catatan |
-| --- | --- |
+| Provider              | Catatan                            |
+| --------------------- | ---------------------------------- |
 | Cloudflare Workers AI | Native di Cloudflare lewat binding |
-| Gemini | API key sendiri |
-| Groq | API key sendiri |
-| OpenRouter | Satu key untuk banyak model |
-| Mistral | API key sendiri |
-| Hugging Face | API key sendiri |
-| Cohere | API key sendiri |
-| NVIDIA | API key sendiri |
+| Gemini                | API key sendiri                    |
+| Groq                  | API key sendiri                    |
+| OpenRouter            | Satu key untuk banyak model        |
+| Mistral               | API key sendiri                    |
+| Hugging Face          | API key sendiri                    |
+| Cohere                | API key sendiri                    |
+| NVIDIA                | API key sendiri                    |
 
 **Peserta:** 4 slot, tiap slot berisi satu provider + satu model, dapat diatur di konfigurasi. Default awal: Workers AI, Gemini, Groq, dan OpenRouter. Disarankan lintas provider agar suaranya beragam. Bila satu provider gagal atau timeout, slot pindah ke provider cadangan.
 
@@ -279,13 +279,13 @@ Kamera bisa fokus ke tiap ruang lewat tombol cepat. Untuk performa HP, ruang yan
 
 ### 10.2 Reaksi terhadap harga
 
-| Kondisi | Reaksi karyawan |
-| --- | --- |
-| Naik signifikan | Bersorak, tos, gerak ceria |
-| Turun signifikan | Panik, memegang kepala, bergegas |
-| Volatilitas tinggi (ATR ekspansi) | Berdiri, mondar-mandir, bicara ramai |
-| Sinyal baru | Meeting: 4 analis AI berkumpul di meja rapat, tiap suara muncul sebagai bubble. Sinyal terbit: analis terkait berdiri dan menunjuk layar |
-| Pasar tenang | Idle: mengetik, sebagian ke ruang kopi atau musolla |
+| Kondisi                           | Reaksi karyawan                                                                                                                          |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Naik signifikan                   | Bersorak, tos, gerak ceria                                                                                                               |
+| Turun signifikan                  | Panik, memegang kepala, bergegas                                                                                                         |
+| Volatilitas tinggi (ATR ekspansi) | Berdiri, mondar-mandir, bicara ramai                                                                                                     |
+| Sinyal baru                       | Meeting: 4 analis AI berkumpul di meja rapat, tiap suara muncul sebagai bubble. Sinyal terbit: analis terkait berdiri dan menunjuk layar |
+| Pasar tenang                      | Idle: mengetik, sebagian ke ruang kopi atau musolla                                                                                      |
 
 Reaksi digerakkan oleh **state pasar** (arah, magnitudo perubahan, volatilitas) yang dihitung di server dan dikirim ke klien, bukan dihitung ulang di tiap perangkat.
 
@@ -346,21 +346,21 @@ Halaman publik menampilkan kantor 3D tanpa login, hanya untuk dilihat (read-only
 
 Usulan awal, bisa dikoreksi. Jumlah karyawan awal 12 dan bisa diatur di konfigurasi.
 
-| Peran | Jumlah | Lokasi utama | Kekhasan |
-| --- | --- | --- | --- |
-| Analis AI | 4 | Lantai 1, area kerja | Satu per slot AI di meeting. Membaca layar trading dan berdiskusi antar analis |
-| Divisi RR | 2 | Lantai 2, area RR | Menghitung risk-reward dan memaparkannya di meeting AI |
-| Bos | 1 | Lantai 2, ruang bos | Telepon, membaca laporan, keliling kantor. Memberi persetujuan akhir di meeting AI |
-| IT | 2 | Lantai 1, pojok IT | Memantau status server dan data. Bereaksi saat sumber data failover atau provider AI gagal (bergegas ke layar, menelepon) |
-| Penerima tamu | 1 | Lobby, lantai 1 | Menyapa, menerima telepon, mengetik. Di tampilan publik memberi bubble sapaan singkat |
-| Karyawan umum | 2 | Tersebar | Rutinitas umum dan bereaksi terhadap harga |
+| Peran         | Jumlah | Lokasi utama         | Kekhasan                                                                                                                  |
+| ------------- | ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Analis AI     | 4      | Lantai 1, area kerja | Satu per slot AI di meeting. Membaca layar trading dan berdiskusi antar analis                                            |
+| Divisi RR     | 2      | Lantai 2, area RR    | Menghitung risk-reward dan memaparkannya di meeting AI                                                                    |
+| Bos           | 1      | Lantai 2, ruang bos  | Telepon, membaca laporan, keliling kantor. Memberi persetujuan akhir di meeting AI                                        |
+| IT            | 2      | Lantai 1, pojok IT   | Memantau status server dan data. Bereaksi saat sumber data failover atau provider AI gagal (bergegas ke layar, menelepon) |
+| Penerima tamu | 1      | Lobby, lantai 1      | Menyapa, menerima telepon, mengetik. Di tampilan publik memberi bubble sapaan singkat                                     |
+| Karyawan umum | 2      | Tersebar             | Rutinitas umum dan bereaksi terhadap harga                                                                                |
 
-| Aktivitas | Gerakan | Tempat | Durasi |
-| --- | --- | --- | --- |
-| Kerja di meja | Duduk, mengetik, membaca layar, sesekali menoleh | Meja kerja | 2–6 menit |
-| Ngobrol dan diskusi | Berdiri berdua atau bertiga dengan gestur bicara | Lorong, dekat layar, ruang kopi | 30–90 detik |
-| Ngopi dan istirahat | Membuat kopi, duduk santai, singgah di musolla | Ruang kopi, musolla | 1–3 menit |
-| Telepon dan presentasi | Telepon sambil berdiri atau berjalan, presentasi di depan layar | Meja, depan layar, ruang rapat | 30–120 detik |
+| Aktivitas              | Gerakan                                                         | Tempat                          | Durasi       |
+| ---------------------- | --------------------------------------------------------------- | ------------------------------- | ------------ |
+| Kerja di meja          | Duduk, mengetik, membaca layar, sesekali menoleh                | Meja kerja                      | 2–6 menit    |
+| Ngobrol dan diskusi    | Berdiri berdua atau bertiga dengan gestur bicara                | Lorong, dekat layar, ruang kopi | 30–90 detik  |
+| Ngopi dan istirahat    | Membuat kopi, duduk santai, singgah di musolla                  | Ruang kopi, musolla             | 1–3 menit    |
+| Telepon dan presentasi | Telepon sambil berdiri atau berjalan, presentasi di depan layar | Meja, depan layar, ruang rapat  | 30–120 detik |
 
 **Aturan pemilihan aktivitas:**
 
@@ -382,8 +382,8 @@ Semi-realistis + 10+ karakter + HP adalah risiko performa terbesar. Strategi:
 
 - **Profil kualitas otomatis:** Low / Medium / High, dipilih dari deteksi perangkat dan FPS awal, bisa diubah manual.
 - **Crowd hemat di HP:** jumlah karakter aktif bergantung profil (mis. Low: analis + sedikit crowd, High: semua). Karakter jauh memakai LOD atau animasi disederhanakan.
-- **Aset:** GLB terkompresi (Draco/Meshopt), tekstur KTX2, atlas tekstur, jumlah material minimal, *baked lighting/lightmap* untuk ruangan statis, bayangan dinamis hanya di High.
-- **Rendering:** batasi devicePixelRatio (mis. maks 1.5–2), *render on demand* saat adegan statis, jeda render saat tab tidak aktif.
+- **Aset:** GLB terkompresi (Draco/Meshopt), tekstur KTX2, atlas tekstur, jumlah material minimal, _baked lighting/lightmap_ untuk ruangan statis, bayangan dinamis hanya di High.
+- **Rendering:** batasi devicePixelRatio (mis. maks 1.5–2), _render on demand_ saat adegan statis, jeda render saat tab tidak aktif.
 - **Instancing** untuk objek berulang (kursi, meja, dekorasi).
 - **Target:** ≥ 30 FPS di HP kelas menengah profil Medium; waktu muat awal (aset inti) < 5 detik di jaringan 4G.
 - **Fallback non-3D:** bila WebGL gagal atau FPS sangat rendah, tampilkan mode daftar/chart 2D agar pengguna tetap bisa memantau.
@@ -398,15 +398,15 @@ Semi-realistis + 10+ karakter + HP adalah risiko performa terbesar. Strategi:
 
 ## 13. Model Data (D1, ringkas)
 
-| Tabel | Kolom utama |
-| --- | --- |
-| `users` | id, password\_hash, created\_at |
-| `candles` | symbol, tf, t, o, h, l, c, v, source |
-| `signals` | id, symbol, tf, direction, score, status, levels\_json, created\_at |
-| `analyses` | id, signal\_id, bias, confidence, summary, raw\_json, model, created\_at |
-| `alerts` | id, user\_id, type, symbol, rule\_json, enabled, cooldown\_s |
-| `alert_log` | id, alert\_id/signal\_id, channel, status, sent\_at |
-| `source_events` | id, symbol, from\_source, to\_source, reason, at |
+| Tabel           | Kolom utama                                                              |
+| --------------- | ------------------------------------------------------------------------ |
+| `users`         | id, password\_hash, created\_at                                          |
+| `candles`       | symbol, tf, t, o, h, l, c, v, source                                     |
+| `signals`       | id, symbol, tf, direction, score, status, levels\_json, created\_at      |
+| `analyses`      | id, signal\_id, bias, confidence, summary, raw\_json, model, created\_at |
+| `alerts`        | id, user\_id, type, symbol, rule\_json, enabled, cooldown\_s             |
+| `alert_log`     | id, alert\_id/signal\_id, channel, status, sent\_at                      |
+| `source_events` | id, symbol, from\_source, to\_source, reason, at                         |
 
 ## 14. API dan Realtime (ringkas)
 
@@ -430,16 +430,16 @@ Semi-realistis + 10+ karakter + HP adalah risiko performa terbesar. Strategi:
 
 ## 16. Fase Pengembangan
 
-| Fase | Isi | Hasil |
-| --- | --- | --- |
-| **0 — Pondasi** | Repo, Pages + Workers, auth, D1 skema | Login berfungsi |
-| **1 — Data** | MarketHub DO untuk BTC (OKX) lalu XAU (OANDA), failover, candle 5 timeframe | Harga/candle realtime + badge sumber + halaman chart dasar |
-| **2 — Scanner** | 4 kelompok scanner, kandidat sinyal, log | Sinyal rule-based tersimpan |
-| **3 — Meeting AI** | Meeting 4 AI: multi-provider, voting, validasi, dedup | Sinyal + hasil voting |
-| **4 — Kantor 3D** | Scene, layar, karyawan analis, orbit, klik-interaksi | Prototipe 3D di HP |
-| **5 — Crowd & Reaksi** | Crowd 10+, perilaku natural, ritme meeting 5 menit, animasi reaksi harga, kantor 2 lantai dengan ruang bos/kopi/musolla, tampilan publik, profil kualitas adaptif | Pengalaman penuh |
-| **6 — Alert** | Discord webhook, pengaturan alert, cooldown | Alert aktif |
-| **7 — Hardening** | Uji performa HP, uji failover, monitoring, perapian | Siap rilis |
+| Fase                   | Isi                                                                                                                                                               | Hasil                                                      |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **0 — Pondasi**        | Repo, Pages + Workers, auth, D1 skema                                                                                                                             | Login berfungsi                                            |
+| **1 — Data**           | MarketHub DO untuk BTC (OKX) lalu XAU (OANDA), failover, candle 5 timeframe                                                                                       | Harga/candle realtime + badge sumber + halaman chart dasar |
+| **2 — Scanner**        | 4 kelompok scanner, kandidat sinyal, log                                                                                                                          | Sinyal rule-based tersimpan                                |
+| **3 — Meeting AI**     | Meeting 4 AI: multi-provider, voting, validasi, dedup                                                                                                             | Sinyal + hasil voting                                      |
+| **4 — Kantor 3D**      | Scene, layar, karyawan analis, orbit, klik-interaksi                                                                                                              | Prototipe 3D di HP                                         |
+| **5 — Crowd & Reaksi** | Crowd 10+, perilaku natural, ritme meeting 5 menit, animasi reaksi harga, kantor 2 lantai dengan ruang bos/kopi/musolla, tampilan publik, profil kualitas adaptif | Pengalaman penuh                                           |
+| **6 — Alert**          | Discord webhook, pengaturan alert, cooldown                                                                                                                       | Alert aktif                                                |
+| **7 — Hardening**      | Uji performa HP, uji failover, monitoring, perapian                                                                                                               | Siap rilis                                                 |
 
 ## 17. Metrik Keberhasilan
 
@@ -452,14 +452,14 @@ Semi-realistis + 10+ karakter + HP adalah risiko performa terbesar. Strategi:
 
 ## 18. Risiko
 
-| Risiko | Dampak | Mitigasi |
-| --- | --- | --- |
-| Performa 3D semi-realistis di HP | UX patah-patah | Kualitas adaptif, LOD, baked lighting, fallback 2D |
-| Kuota/limit API OANDA & Twelve Data | Data emas terputus | Cek plan lebih awal, cache, polling cerdas, fallback |
-| Beda harga antar sumber saat failover | Candle terlihat gap | Tandai peristiwa failover, normalisasi |
-| Biaya/latensi 4 panggilan AI per meeting | Lambat/mahal | Meeting hanya saat ≥ 2 kelompok searah, dedup, timeout per AI, provider cadangan |
-| Sinyal salah / pengguna terlalu percaya | Kerugian pengguna | Disclaimer, label keyakinan, status "dipertanyakan" |
-| Lisensi data pihak ketiga | Hambatan jika dipublikasikan | Verifikasi syarat penggunaan sebelum rilis publik |
+| Risiko                                   | Dampak                       | Mitigasi                                                                         |
+| ---------------------------------------- | ---------------------------- | -------------------------------------------------------------------------------- |
+| Performa 3D semi-realistis di HP         | UX patah-patah               | Kualitas adaptif, LOD, baked lighting, fallback 2D                               |
+| Kuota/limit API OANDA & Twelve Data      | Data emas terputus           | Cek plan lebih awal, cache, polling cerdas, fallback                             |
+| Beda harga antar sumber saat failover    | Candle terlihat gap          | Tandai peristiwa failover, normalisasi                                           |
+| Biaya/latensi 4 panggilan AI per meeting | Lambat/mahal                 | Meeting hanya saat ≥ 2 kelompok searah, dedup, timeout per AI, provider cadangan |
+| Sinyal salah / pengguna terlalu percaya  | Kerugian pengguna            | Disclaimer, label keyakinan, status "dipertanyakan"                              |
+| Lisensi data pihak ketiga                | Hambatan jika dipublikasikan | Verifikasi syarat penggunaan sebelum rilis publik                                |
 
 ## 19. Pertanyaan Terbuka
 
@@ -490,7 +490,6 @@ Semi-realistis + 10+ karakter + HP adalah risiko performa terbesar. Strategi:
 - **Peran bos di meeting:** diputuskan: memberi persetujuan akhir sinyal. Persetujuan otomatis berbasis aturan, tanpa mode manual.
 - **Tampilan publik:** rekomendasi dipakai: suasana kantor, mood pasar, dan status meeting, tanpa harga, arah sinyal, dan level. Lisensi data OANDA dan Twelve Data untuk tampilan publik perlu dicek.
 - **Tata letak 2 lantai:** dikonfirmasi: lantai 2 berisi ruang bos, divisi RR, dan ruang rapat; lantai 1 berisi sisanya.
-
 
 ---
 
@@ -564,7 +563,7 @@ Scanner hanya boleh menjadi penentu jika **semua** syarat ini terpenuhi:
 4. Penilaian menggunakan hasil scanner untuk **aset dan timeframe yang sama** pada putaran relevan.
 5. **Ambang skor per kelompok dan margin selisih total skor** dapat diubah di admin, divalidasi oleh backend, dan dicatat versinya.
 
-Jika syarat tersebut gagal, bos tidak memaksakan keputusan dan sinyal ditolak. **Nilai angka margin belum dipilih**, sehingga jangan menganggap angka tertentu sebagai keputusan pengguna.
+Jika syarat tersebut gagal, bos tidak memaksakan keputusan dan sinyal ditolak. **Margin default 40 poin dikonfirmasi pada 12 Oktober 2026**; override numerik admin tetap dipertahankan, dan null dapat dipilih admin untuk menonaktifkan tie-breaker.
 
 ### 20.9 Validasi RR — Keputusan 9 (Opsi A)
 
@@ -577,40 +576,88 @@ Jika syarat tersebut gagal, bos tidak memaksakan keputusan dan sinyal ditolak. *
 
 ### 20.10 Masa berlaku dan pembatalan — Keputusan 10 (Opsi D)
 
-- Setiap sinyal memiliki masa berlaku berdasarkan **timeframe**; nilai durasi spesifik masih belum dipilih.
+- Setiap sinyal memiliki batas waktu menunggu entry berdasarkan **timeframe**; durasi yang dikonfirmasi tercantum pada bagian 20.11.
 - Setelah bos menyetujui, sinyal berstatus **menunggu entry** sampai harga mencapai harga/zona entry.
-- Sistem merekam **waktu dan harga saat entry tersentuh**, lalu memantau TP1–TP3 (yang ada), SL, invalidasi struktur pasar, serta sinyal baru yang berlawanan.
+- Sistem merekam **waktu dan harga saat entry tersentuh**, lalu memantau **TP1 dan SL**. Sinyal selesai segera pada TP1; TP2/TP3 tetap ditampilkan sebagai informasi tambahan. Pembatalan struktur otomatis dinonaktifkan, dan sinyal berlawanan hanya membatalkan yang masih menunggu entry pada timeframe sama (20.12).
 - Sinyal dapat berakhir dengan status **target tercapai, stop loss, dibatalkan, atau kedaluwarsa** sesuai aturan yang akan dikunci.
 - Perubahan status dan peristiwa harga disimpan untuk audit dan evaluasi kualitas sinyal; **tidak ada eksekusi order**.
 - Ini **mengubah non-tujuan pelacakan hasil di bagian 19 angka 4**: pelacakan status entry/TP/SL kini termasuk cakupan, tetapi bukan trading otomatis.
-- Prioritas peristiwa bersamaan (mis. TP dan SL dalam candle yang sama), kondisi penutupan setelah TP1 ketika ada TP2/TP3, dan pembatalan sinyal bertentangan belum ditetapkan secara rinci.
+- Urutan tick yang teramati menentukan sentuhan. Jika candle menyentuh TP1 dan SL tanpa urutan tick, hasil **ambigu**, bukan kemenangan atau kerugian yang ditebak. Kebijakan rinci tercatat pada 20.12.
+
+### 20.11 Durasi menunggu entry — Keputusan 11 (Opsi A, 12 Oktober 2026)
+
+Pemilik mengonfirmasi opsi **A** saat melanjutkan implementasi:
+
+| Timeframe | Batas waktu menunggu entry |
+| --------- | -------------------------- |
+| 5m        | 15 menit                   |
+| 15m       | 45 menit                   |
+| H1        | 3 jam                      |
+| H4        | 12 jam                     |
+| D1        | 3 hari                     |
+
+- Durasi hanya membatasi **waktu menunggu entry**. Setelah entry tersentuh, hitung mundur **berhenti** dan sinyal dipantau sampai target akhir, SL, atau pembatalan yang berlaku.
+- Deadline entry asli tetap tersimpan untuk audit; tanggal kedaluwarsa lama tidak ditulis ulang pada sinyal historis.
+- Default tetap dapat diubah di admin. Konfigurasi lama yang masih kosong diisi melalui migrasi berversi/audit, tanpa menimpa override numerik.
+- Durasi emas **sebelum entry** hanya menghitung waktu pasar buka menurut status provider. Durasi dijeda saat tutup atau status tidak diketahui, dengan peringatan dan sisa budget tersimpan (20.12).
+- Margin default 40 dan kebijakan pembatalan sudah dikonfirmasi pada 20.12.
+
+### 20.12 Keputusan lanjutan saat implementasi — 12 Oktober 2026
+
+Semua baris berikut adalah jawaban eksplisit pemilik saat coding dilanjutkan, menggantikan ketentuan lama yang bertentangan.
+
+| Area                 | Keputusan terkonfirmasi                                                                                                                                                                                                                                  |
+| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tie-breaker          | Margin minimum selisih total skor **40**, tetap mensyaratkan jumlah kelompok pendukung lebih banyak dan minimal dua kelompok valid.                                                                                                                      |
+| Durasi XAUUSD        | Hitung **waktu pasar buka saja**, berdasarkan status provider. Saat tutup atau status tidak diketahui, jeda dan tampilkan peringatan.                                                                                                                    |
+| Sinyal berlawanan    | Batalkan hanya **menunggu entry**, aset dan timeframe sama. Sinyal yang sudah entry tetap dipantau.                                                                                                                                                      |
+| TP                   | Sinyal **selesai segera pada TP1**; TP2/TP3 tetap informasi tambahan. SL dapat mengakhiri lebih dulu jika urutan tick teramati menunjukkan SL pertama.                                                                                                   |
+| OHLC ambigu          | Jangan memilih TP atau SL dari candle yang menyentuh keduanya tanpa urutan tick. Status **ambigu**, hasil tidak diketahui; tick setelah gap tidak membuktikan urutan sentuhan sebelumnya.                                                                |
+| Lintas timeframe     | Berjalan mandiri, termasuk arah berlawanan; tampilkan peringatan konflik.                                                                                                                                                                                |
+| Invalidasi struktur  | Gunakan SL dahulu; pembatalan struktur otomatis **tetap nonaktif**.                                                                                                                                                                                      |
+| AI gagal/abstain     | Mayoritas memerlukan minimal tiga suara **searah**. Tie-breaker hanya untuk empat suara valid, tepat **2 LONG–2 SHORT**; gagal/abstain tidak digantikan scanner.                                                                                         |
+| SMC/ICT              | Swing dikonfirmasi oleh **3 candle kiri dan kanan** secara default; sensitivitas dapat diubah admin. BOS = close melewati swing; CHoCH = break pertama melawan tren; FVG = gap wick tiga candle; order block = candle berlawanan terakhir sebelum break. |
+| Volume emas kosong   | Gunakan proxy perpetual emas **yang kontraknya diverifikasi tersedia**. Jika proxy gagal/tidak cocok timeframe atau waktu candle, kelompok abstain. Harga proxy tidak menjadi harga acuan spot.                                                          |
+| Karakter kantor      | **11 inti + 2 pendukung**, IT dan resepsionis; total **13 karakter**.                                                                                                                                                                                    |
+| Durasi setelah entry | Tetap mengikuti 20.11: hitung mundur berhenti setelah entry teramati.                                                                                                                                                                                    |
+
+**Ketentuan implementasi yang dapat ditelusuri:**
+
+- Pivot strict (lebih tinggi/rendah daripada semua tetangga), baru terlihat setelah seluruh candle kanan close; tidak memakai informasi masa depan. Satu pivot menghasilkan satu break. Chart dan scanner memakai fungsi yang sama, pada candle closed.
+- Jam entry emas menyimpan sisa milidetik, titik waktu evaluasi, status dan batas freshness. Status buka berlaku paling lama 30 detik dari tick/provider yang segar; periode setelah batas itu dianggap tidak diketahui dan dijeda. Restart memakai state tersimpan, bukan reset budget.
+- Sinyal lama tanpa jam entry emas diinisialisasi dari sisa deadline lama; waktu tutup historis yang tidak tercatat **tidak direkonstruksi**.
+- Candle ambigu yang terjadi sebelum sebuah exit baru teramati dapat mengubah hasil keseluruhan menjadi tidak diketahui; peristiwa harga exit lama tetap tersimpan untuk audit. Candle yang baru menyentuh level lain **setelah exit tick yang diketahui** tidak membatalkan hasil tersebut.
+- Publikasi dan pembatalan ditulis dalam satu batch D1. Perubahan status menyimpan alasan, pengganti sinyal, waktu, dan harga teramati bila tersedia; harga yang tidak teramati disimpan null.
+- Kunci API tetap terenkripsi di D1 dan write-only di UI; hanya master key enkripsi sebagai Worker secret, sesuai desain bagian 6. Rahasia tidak disimpan pada audit sinyal.
 
 ## 21. Pertanyaan Lanjutan — Belum Diputuskan
 
-### Pertanyaan 11: Durasi berlaku sinyal per timeframe
+### Pertanyaan 11: Durasi berlaku sinyal per timeframe — sudah dipilih A
 
-Pengguna **belum memilih** salah satu opsi berikut. Seluruh angka di tabel ini adalah **usulan**, bukan keputusan final.
+Pengguna **sudah memilih A pada 12 Oktober 2026**, dengan hitung mundur berhenti setelah entry (bagian 20.11). Opsi lain di tabel dipertahankan sebagai alternatif historis, bukan keputusan.
 
-| Opsi | 5m | 15m | H1 | H4 | D1 |
-| --- | --- | --- | --- | --- | --- |
-| A — Pendek | 15 menit | 45 menit | 3 jam | 12 jam | 3 hari |
-| B — Seimbang | 30 menit | 90 menit | 6 jam | 24 jam | 5 hari |
-| C — Panjang | 1 jam | 3 jam | 12 jam | 48 jam | 7 hari |
-| D — Adaptif | Ditentukan menggunakan ATR, struktur pasar dan batas admin | Ditentukan secara adaptif | Ditentukan secara adaptif | Ditentukan secara adaptif | Ditentukan secara adaptif |
+| Opsi         | 5m                                                         | 15m                       | H1                        | H4                        | D1                        |
+| ------------ | ---------------------------------------------------------- | ------------------------- | ------------------------- | ------------------------- | ------------------------- |
+| A — Pendek   | 15 menit                                                   | 45 menit                  | 3 jam                     | 12 jam                    | 3 hari                    |
+| B — Seimbang | 30 menit                                                   | 90 menit                  | 6 jam                     | 24 jam                    | 5 hari                    |
+| C — Panjang  | 1 jam                                                      | 3 jam                     | 12 jam                    | 48 jam                    | 7 hari                    |
+| D — Adaptif  | Ditentukan menggunakan ATR, struktur pasar dan batas admin | Ditentukan secara adaptif | Ditentukan secara adaptif | Ditentukan secara adaptif | Ditentukan secara adaptif |
 
-**Saran asisten sebelumnya:** Opsi B. Ini bukan pilihan pengguna. Juga terdapat **usulan** supaya waktu tutup pasar XAUUSD tidak dihitung sebagai masa berlaku aktif; ini belum dikonfirmasi secara eksplisit.
+**Saran asisten sebelumnya:** Opsi B; pemilik kemudian memilih **A**. Pemilik kemudian mengonfirmasi durasi pasar buka saja, dengan jeda saat status provider tidak diketahui (20.12).
 
-### Keputusan yang masih perlu diperjelas untuk benar-benar final
+### Rincian yang masih terbuka sebelum produksi
 
-- Bagaimana sinyal dari **timeframe berbeda** dapat hidup bersamaan, termasuk ketika H1 dan H4 bertentangan.
-- Nilai default numerik **margin keunggulan scanner** untuk tie-breaker dan aturan bila suara AI abstain/gagal.
-- Definisi formal BOS, CHoCH, FVG, order block, sensitivitas swing dan bobot/proxy volume maupun derivatives XAUUSD.
-- Prioritas dan aturan status sinyal saat TP1/TP2/TP3, SL, dan peristiwa bersamaan; apakah masa berlaku berakhir setelah entry atau terus berjalan.
-- Jumlah akhir karakter pendukung, alokasi kursi, dan revisi tabel peran yang awalnya menyebut 12 karakter (sebelum ada 11 karakter inti).
-- Konfirmasi ketersediaan API, cakupan riwayat, lisensi data, dan kontrak perpetual emas sebagaimana sudah ditandai pada draf v1.
-- Rekonsiliasi teknis **penyimpanan API key terenkripsi di D1** versus satu kalimat lama di bagian 8 yang menyebut setiap key sebagai Worker secret; draf v1 pada bagian 6 telah menetapkan desain UI write-only dengan hanya kunci enkripsi utama sebagai Worker secret.
-- Harmonisasi fase dan skema D1 dengan **pelacakan status entry/TP/SL** yang baru disepakati.
+- Bobot/ambang lanjutan volume, VWAP/volume profile dan derivatives, serta verifikasi akses API CFTC. COT dikonfirmasi sebagai konteks meeting AI saja, tanpa perubahan skor/arah scanner. Definisi inti SMC/ICT sudah dikonfirmasi pada 20.12.
+- Verifikasi ketersediaan kontrak emas, batas rate/kuota, cakupan histori setahun, dan lisensi provider pada akun nyata.
+- Pemilihan model/plan, batas biaya dan kuota harian AI, serta acceptance integrasi empat slot dan channel Discord nyata.
+- Finalisasi aset karakter GLB/rig/LOD dan desain animasi; jumlah 13 karakter sudah dikunci.
+- Konfigurasi Cloudflare/D1 produksi, DNS, backup/rotasi, monitoring, serta pengukuran performa dan uptime pada perangkat target.
 
 ## 22. Status Dokumen
 
-**Draf v2 — sedang difinalisasi melalui tanya jawab.** Bagian 20 memuat keputusan yang sudah dikonfirmasi; bagian 21 tidak boleh diperlakukan sebagai spesifikasi final. Tidak ada coding, deployment, atau perubahan repository dalam pembuatan dokumen ini.
+**Draf v2 — sedang difinalisasi melalui tanya jawab.** Bagian 20 memuat keputusan yang sudah dikonfirmasi; bagian 21 tidak boleh diperlakukan sebagai spesifikasi final. Pembuatan draf awal tidak mengubah repository. Pada 12 Oktober 2026 coding dilanjutkan sesuai bagian 20 dan keputusan 20.11–20.12; deployment produksi belum dilakukan.
+
+
+### Konfirmasi lanjutan COT — 12 Oktober 2026
+
+Pemilik memilih COT sebagai konteks meeting AI XAUUSD saja; tidak mengubah skor atau arah scanner. Implementasi memakai CFTC Disaggregated Futures Only, COMEX gold 088691, Managed Money. Data mingguan tersimpan di D1 dan snapshot meeting mencatat sumber, tanggal posisi (bukan tanggal rilis), pengambilan, pemeriksaan dan freshness. Data kedaluwarsa/tidak tersedia dikecualikan dari posisi dalam prompt; scanner berjalan mandiri. Akses endpoint API nyata masih perlu diverifikasi.

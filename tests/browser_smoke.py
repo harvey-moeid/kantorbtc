@@ -39,6 +39,26 @@ with sync_playwright() as p:
  page.get_by_role('link',name='Pengaturan',exact=True).click()
  for tab in ['Scanner & risiko','Susunan AI','Koneksi API','Histori & backfill','Alert Discord','Umum & tampilan']:
   page.get_by_role('button',name=tab,exact=True).click()
+ page.get_by_role('button',name='Susunan AI',exact=True).click()
+ slot=page.locator('.ai-slot').first
+ slot.get_by_role('button',name='Tambah provider cadangan',exact=True).click()
+ requested_providers=['Groq','NVIDIA','Cohere','Hugging Face','Mistral','Gemini']
+ primary=page.get_by_role('combobox',name='Provider slot 1',exact=True)
+ fallback=page.get_by_role('combobox',name='Fallback provider slot 1 1',exact=True)
+ for provider in requested_providers:
+  primary.select_option(provider);expect(primary).to_have_value(provider)
+  fallback.select_option(provider);expect(fallback).to_have_value(provider)
+ primary.select_option('Workers AI');fallback.select_option('Groq')
+ page.get_by_role('textbox',name='Fallback model slot 1 1',exact=True).fill('fallback-model')
+ slot.get_by_role('button',name='Tambah provider cadangan',exact=True).click()
+ assert slot.get_by_role('button',name='Tambah provider cadangan',exact=True).count()==0
+ expect(slot.get_by_role('button',name='Hapus cadangan',exact=True)).to_have_count(2)
+ slot.get_by_role('button',name='Hapus cadangan',exact=True).first.click()
+ expect(slot.get_by_role('button',name='Hapus cadangan',exact=True)).to_have_count(1)
+ page.get_by_role('button',name='Koneksi API',exact=True).click()
+ for provider in requested_providers:
+  expect(page.locator('.provider-list').get_by_text(provider,exact=True)).to_be_visible()
+ page.get_by_role('button',name='Umum & tampilan',exact=True).click()
  page.get_by_role('button',name='Simpan pengaturan',exact=True).click()
  assert page.locator('[role=status]').is_visible()
  page.get_by_role('button',name='Ganti bahasa',exact=True).click()

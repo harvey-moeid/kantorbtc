@@ -127,7 +127,9 @@ export default function App() {
     [mobileMenu, setMobileMenu] = useState(false),
     [notificationOpen, setNotificationOpen] = useState(false),
     state = useStore(),
-    started = useRef(false);
+    started = useRef(false),
+    sidebarRef = useRef<HTMLElement>(null),
+    menuRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (started.current) return;
     started.current = true;
@@ -148,7 +150,51 @@ export default function App() {
   }, []);
   useEffect(() => {
     setMobileMenu(false);
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   }, [location.pathname]);
+  useEffect(() => {
+    if (!mobileMenu) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const sidebar = sidebarRef.current;
+    const focusable = () =>
+      Array.from(
+        sidebar?.querySelectorAll<HTMLElement>(
+          "a[href],button:not(:disabled),select",
+        ) ?? [],
+      ).filter((element) => element.getClientRects().length);
+    focusable()[0]?.focus();
+    const keydown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setMobileMenu(false);
+      }
+      if (event.key === "Tab") {
+        const elements = focusable(),
+          first = elements[0],
+          last = elements.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    const viewport = window.matchMedia("(min-width: 761px)");
+    const resize = () => {
+      if (viewport.matches) setMobileMenu(false);
+    };
+    document.addEventListener("keydown", keydown);
+    viewport.addEventListener("change", resize);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", keydown);
+      viewport.removeEventListener("change", resize);
+      menuRef.current?.focus();
+    };
+  }, [mobileMenu]);
   useEffect(() => {
     document.documentElement.lang = state.settings.language;
   }, [state.settings.language]);
@@ -266,7 +312,26 @@ export default function App() {
   ] as const;
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}>
+      <a className="skip-link" href="#workspace-content">
+        {state.settings.language === "id"
+          ? "Lewati ke konten"
+          : "Skip to content"}
+      </a>
+      <aside
+        ref={sidebarRef}
+        id="workspace-menu"
+        className={`sidebar ${mobileMenu ? "mobile-open" : ""}`}
+        role={mobileMenu ? "dialog" : undefined}
+        aria-modal={mobileMenu || undefined}
+        aria-label={t.workspace}
+      >
+        <button
+          className="icon-button sidebar-close"
+          aria-label="Tutup menu"
+          onClick={() => setMobileMenu(false)}
+        >
+          <X size={20} />
+        </button>
         <NavLink className="brand" to="/office">
           <span className="brand-mark">
             k<span>.</span>
@@ -286,11 +351,12 @@ export default function App() {
           <ChevronDown size={14} />
         </div>
         <span className="nav-label">{t.workspace}</span>
-        <nav className="main-nav">
+        <nav className="main-nav" aria-label={t.workspace}>
           {nav.map(([to, Icon, label]) => (
             <NavLink
               key={to}
               to={to}
+              aria-label={label}
               className={({ isActive }) =>
                 isActive ||
                 (to.includes("/chart/") &&
@@ -301,6 +367,7 @@ export default function App() {
               onClick={(e) => {
                 if (state.publicView && to !== "/office") {
                   e.preventDefault();
+                  setMobileMenu(false);
                   setLogin(true);
                 }
               }}
@@ -349,6 +416,7 @@ export default function App() {
             onClick={(e) => {
               if (state.publicView) {
                 e.preventDefault();
+                setMobileMenu(false);
                 setLogin(true);
               }
             }}
@@ -386,16 +454,22 @@ export default function App() {
           onClick={() => setMobileMenu(false)}
         />
       )}
-      <div className="main-shell">
+      <div className="main-shell" inert={mobileMenu}>
         <header className="topbar">
           <div>
             <button
               className="icon-button mobile-menu"
+              ref={menuRef}
+              aria-controls="workspace-menu"
+              aria-expanded={mobileMenu}
               aria-label="Buka menu"
               onClick={() => setMobileMenu(!mobileMenu)}
             >
               <Menu size={21} />
             </button>
+            <span className="mobile-wordmark">
+              KANTOR<small>INTELLIGENCE</small>
+            </span>
             <span className="topbar-workspace">
               My workspace <ChevronRight size={13} />{" "}
               <b>
@@ -416,15 +490,30 @@ export default function App() {
               tone={state.demo ? "amber" : state.publicView ? "" : "green"}
             >
               <i className="dot" />
-              {state.demo
-                ? t.demo
-                : state.publicView
-                  ? t.public
-                  : state.connection === "live"
-                    ? t.live
-                    : state.connection === "offline"
-                      ? "OFFLINE"
-                      : "MENGHUBUNGKAN"}
+              <span className="mode-wide">
+                {state.demo
+                  ? t.demo
+                  : state.publicView
+                    ? t.public
+                    : state.connection === "live"
+                      ? t.live
+                      : state.connection === "offline"
+                        ? "OFFLINE"
+                        : "MENGHUBUNGKAN"}
+              </span>
+              <span className="mode-compact">
+                {state.demo
+                  ? "DEMO"
+                  : state.publicView
+                    ? state.settings.language === "id"
+                      ? "PUBLIK"
+                      : "PUBLIC"
+                    : state.connection === "live"
+                      ? "LIVE"
+                      : state.connection === "offline"
+                        ? "OFFLINE"
+                        : "…"}
+              </span>
             </Badge>
             <button
               className="icon-button language-button"
@@ -503,7 +592,7 @@ export default function App() {
             </button>
           </div>
         )}
-        <main>
+        <main id="workspace-content" tabIndex={-1}>
           <Suspense
             fallback={<div className="empty-state tall">Memuat workspace…</div>}
           >
@@ -580,6 +669,41 @@ export default function App() {
           </span>
         </footer>
       </div>
+      <nav
+        className="mobile-dock"
+        aria-label={
+          state.settings.language === "id"
+            ? "Navigasi utama"
+            : "Main navigation"
+        }
+        inert={mobileMenu}
+      >
+        {[...nav, ["/settings", Settings2, t.settings] as const].map(
+          ([to, Icon, label]) => (
+            <NavLink
+              key={to}
+              to={to}
+              aria-label={`${state.settings.language === "id" ? "Buka" : "Open"} ${label}`}
+              className={({ isActive }) =>
+                isActive ||
+                (to.includes("/chart/") &&
+                  location.pathname.startsWith("/chart/"))
+                  ? "active"
+                  : ""
+              }
+              onClick={(event) => {
+                if (state.publicView && to !== "/office") {
+                  event.preventDefault();
+                  setLogin(true);
+                }
+              }}
+            >
+              <Icon size={20} strokeWidth={1.8} />
+              <span>{label}</span>
+            </NavLink>
+          ),
+        )}
+      </nav>
       {login && <Login onClose={() => setLogin(false)} />}
       <StaffPanel />
       {notificationOpen && (

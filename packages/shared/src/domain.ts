@@ -43,6 +43,13 @@ export type Vote = z.infer<typeof voteSchema> & {
   provider: string;
   model: string;
   latency: number;
+  attempts?: {
+    provider: string;
+    model: string;
+    status:
+      "valid" | "unavailable" | "timeout" | "invalid_output" | "provider_error";
+    latency: number;
+  }[];
 };
 export type SignalStatus =
   | "menunggu_entry"
@@ -51,7 +58,8 @@ export type SignalStatus =
   | "stop_loss"
   | "dibatalkan"
   | "kedaluwarsa"
-  | "ditolak";
+  | "ditolak"
+  | "ambigu";
 export interface Signal {
   id: string;
   symbol: Symbol;
@@ -67,10 +75,37 @@ export interface Signal {
   votes: Vote[];
   scanner: Scan[];
   tieBreaker: boolean;
+  entryClock?: {
+    remainingMs: number;
+    at: number;
+    state: "open" | "closed" | "unknown";
+    knownUntil: number;
+  };
+  ambiguousSince?: number;
+  exitAt?: number;
+  exitPrice?: number;
+  cancelledAt?: number;
+  cancellationReason?: "opposing_signal_same_timeframe";
+  cancelledBySignalId?: string;
   entryTouchedAt?: number;
   entryTouchedPrice?: number;
   hitTargets: number[];
   settingsVersion: number;
+}
+export interface CotReport {
+  reportDate: string;
+  fetchedAt: number;
+  source: string;
+  contract: "088691";
+  openInterest: number;
+  managedMoney: { long: number; short: number; spreading: number; net: number };
+  netChange: number | null;
+}
+export interface CotContext {
+  status: "fresh" | "stale" | "unavailable";
+  checkedAt: number | null;
+  warning: string | null;
+  report: CotReport | null;
 }
 export interface Meeting {
   id: string;
@@ -82,6 +117,7 @@ export interface Meeting {
   votes: Vote[];
   reason: string;
   signalId?: string;
+  cot?: CotContext;
 }
 export interface Quote {
   symbol: Symbol;
@@ -109,7 +145,7 @@ export const settingsSchema = z
       derivatives: z.boolean(),
     }),
     minGroups: z.number().int().min(2).max(4).default(2),
-    tieMargin: z.number().min(0).max(400).nullable().default(null),
+    tieMargin: z.number().min(0).max(400).nullable().default(40),
     ttl: z.object({
       "5m": z.number().int().min(300).nullable(),
       "15m": z.number().int().min(900).nullable(),
@@ -137,8 +173,8 @@ export const defaultSettings: Settings = {
   thresholds: { smc: 60, indicators: 60, volume: 60, derivatives: 60 },
   enabled: { smc: true, indicators: true, volume: true, derivatives: true },
   minGroups: 2,
-  tieMargin: null,
-  ttl: { "5m": null, "15m": null, H1: null, H4: null, D1: null },
+  tieMargin: 40,
+  ttl: { "5m": 900, "15m": 2700, H1: 10800, H4: 43200, D1: 259200 },
   emaFast: 20,
   emaSlow: 50,
   rsiPeriod: 14,

@@ -1,3 +1,10 @@
+import {
+  aiSettingsSchema,
+  aiProviders,
+  connectionProviders,
+  defaultSlots,
+  type Slot,
+} from "../../../../packages/shared/src/ai-config";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -22,19 +29,7 @@ import { api, useStore } from "../store";
 import { useT } from "../i18n";
 import { Badge, Modal, PageTitle } from "../components/UI";
 import DataOperations from "../components/DataOperations";
-export const providers = [
-  "Workers AI",
-  "Gemini",
-  "Groq",
-  "OpenRouter",
-  "Mistral",
-  "Hugging Face",
-  "Cohere",
-  "NVIDIA",
-  "OANDA",
-  "Twelve Data",
-  "Discord",
-];
+export const providers = connectionProviders;
 export default function SettingsPage() {
   const current = useStore((s) => s.settings),
     demo = useStore((s) => s.demo),
@@ -52,18 +47,9 @@ export default function SettingsPage() {
     >([]),
     [provider, setProvider] = useState(""),
     [keyValue, setKeyValue] = useState(""),
-    [slotModels, setSlotModels] = useState([
-      {
-        provider: "Workers AI",
-        model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-      },
-      { provider: "Gemini", model: "gemini-2.5-flash" },
-      { provider: "Groq", model: "llama-3.3-70b-versatile" },
-      {
-        provider: "OpenRouter",
-        model: "mistralai/mistral-small-3.2-24b-instruct",
-      },
-    ]),
+    [slotModels, setSlotModels] = useState<Slot[]>(
+      structuredClone(defaultSlots),
+    ),
     t = useT();
   useEffect(() => {
     if (!demo) {
@@ -213,9 +199,9 @@ export default function SettingsPage() {
                 description="Empat kelompok dievaluasi pada candle yang sudah close."
               />
               <div className="callout">
-                Margin tie-breaker dan durasi sinyal belum diputuskan dalam PRD.
-                Nilai kosong menonaktifkan tie-breaker dan penerbitan sinyal
-                live untuk timeframe tersebut.
+                Margin tie-breaker default 40. Durasi default mengikuti pilihan
+                A dan berhenti setelah entry. Nilai kosong menonaktifkan
+                tie-breaker dan penerbitan sinyal live untuk timeframe tersebut.
               </div>
               {(Object.keys(groupNames) as (keyof typeof groupNames)[]).map(
                 (g) => (
@@ -345,6 +331,13 @@ export default function SettingsPage() {
               </div>
             </>
           )}
+          {tab === "scanner" && (
+            <div className="callout">
+              {current.language === "id"
+                ? "Sinyal selesai pada TP1. Emas hanya menghitung waktu pasar buka berdasarkan status provider; durasi dijeda saat tutup atau status tidak diketahui. Sinyal berlawanan membatalkan yang masih menunggu entry pada timeframe sama. Timeframe berbeda berjalan mandiri dengan peringatan konflik. Pembatalan struktur otomatis nonaktif; SL tetap berlaku."
+                : "Signals finish at TP1. Gold counts open-market time from provider status; the clock pauses when closed or unknown. Opposing signals cancel waiting entries on the same timeframe. Different timeframes run independently with conflict warnings. Automatic structure cancellation is disabled; SL remains active."}
+            </div>
+          )}
           {tab === "ai" && (
             <>
               <SettingsTitle
@@ -352,8 +345,9 @@ export default function SettingsPage() {
                 description="Analisis dijalankan paralel; presentasi menggunakan hasil yang sama."
               />
               <div className="callout">
-                Provider perlu kredensial aktif. Jika slot gagal setelah satu
-                retry, hasilnya abstain. Tanpa kuorum tidak ada sinyal.
+                {current.language === "id"
+                  ? "Empat slot menganalisis secara paralel. Setiap provider dicoba ulang sekali, lalu pindah ke cadangan sesuai urutan (maksimal dua). Seluruh kegagalan menghasilkan abstain."
+                  : "Four slots analyze in parallel. Each provider gets one retry before moving to the next fallback (up to two). If all fail, the slot abstains."}
               </div>
               {slotModels.map((slot, i) => (
                 <div className="ai-slot" key={i}>
@@ -378,12 +372,18 @@ export default function SettingsPage() {
                         onChange={(e) =>
                           setSlotModels(
                             slotModels.map((s, j) =>
-                              j === i ? { ...s, provider: e.target.value } : s,
+                              j === i
+                                ? {
+                                    ...s,
+                                    provider: e.target
+                                      .value as Slot["provider"],
+                                  }
+                                : s,
                             ),
                           )
                         }
                       >
-                        {providers.slice(0, 8).map((p) => (
+                        {aiProviders.map((p) => (
                           <option key={p}>{p}</option>
                         ))}
                       </select>
@@ -399,6 +399,114 @@ export default function SettingsPage() {
                         }
                       />
                     </div>
+                    {(slot.fallbacks ?? []).map((fallback, k) => (
+                      <div className="form-grid" key={k}>
+                        <label>
+                          {current.language === "id"
+                            ? "Provider cadangan"
+                            : "Fallback provider"}{" "}
+                          {k + 1}
+                          <select
+                            aria-label={`Fallback provider slot ${i + 1} ${k + 1}`}
+                            value={fallback.provider}
+                            onChange={(e) =>
+                              setSlotModels(
+                                slotModels.map((s, j) =>
+                                  j === i
+                                    ? {
+                                        ...s,
+                                        fallbacks: s.fallbacks.map((f, n) =>
+                                          n === k
+                                            ? {
+                                                ...f,
+                                                provider: e.target
+                                                  .value as Slot["provider"],
+                                              }
+                                            : f,
+                                        ),
+                                      }
+                                    : s,
+                                ),
+                              )
+                            }
+                          >
+                            {aiProviders.map((p) => (
+                              <option key={p}>{p}</option>
+                            ))}
+                          </select>
+                        </label>
+                        <label>
+                          {current.language === "id"
+                            ? "Model cadangan"
+                            : "Fallback model"}
+                          <input
+                            aria-label={`Fallback model slot ${i + 1} ${k + 1}`}
+                            value={fallback.model}
+                            onChange={(e) =>
+                              setSlotModels(
+                                slotModels.map((s, j) =>
+                                  j === i
+                                    ? {
+                                        ...s,
+                                        fallbacks: s.fallbacks.map((f, n) =>
+                                          n === k
+                                            ? { ...f, model: e.target.value }
+                                            : f,
+                                        ),
+                                      }
+                                    : s,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <button
+                          className="button small ghost"
+                          onClick={() =>
+                            setSlotModels(
+                              slotModels.map((s, j) =>
+                                j === i
+                                  ? {
+                                      ...s,
+                                      fallbacks: s.fallbacks.filter(
+                                        (_, n) => n !== k,
+                                      ),
+                                    }
+                                  : s,
+                              ),
+                            )
+                          }
+                        >
+                          {current.language === "id"
+                            ? "Hapus cadangan"
+                            : "Remove fallback"}
+                        </button>
+                      </div>
+                    ))}
+                    {(slot.fallbacks ?? []).length < 2 && (
+                      <button
+                        className="button small ghost"
+                        onClick={() =>
+                          setSlotModels(
+                            slotModels.map((s, j) =>
+                              j === i
+                                ? {
+                                    ...s,
+                                    fallbacks: [
+                                      ...(s.fallbacks ?? []),
+                                      { provider: "Groq", model: "" },
+                                    ],
+                                  }
+                                : s,
+                            ),
+                          )
+                        }
+                      >
+                        {current.language === "id"
+                          ? "Tambah provider cadangan"
+                          : "Add fallback provider"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -412,10 +520,14 @@ export default function SettingsPage() {
                       throw new Error(
                         "Susunan AI live memerlukan login dan backend.",
                       );
+                    const payload = aiSettingsSchema.parse({
+                      slots: slotModels,
+                    });
                     await api("/settings/ai", {
                       method: "PUT",
-                      body: JSON.stringify({ slots: slotModels }),
+                      body: JSON.stringify(payload),
                     });
+                    setSlotModels(payload.slots);
                     useStore.getState().notify("Empat slot AI disimpan.");
                   } catch (e) {
                     useStore.getState().notify((e as Error).message);

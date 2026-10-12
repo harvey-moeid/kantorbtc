@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Zap } from "lucide-react";
-import type { Signal } from "../../../../packages/shared/src/domain";
 import { useStore } from "../store";
 import { useT } from "../i18n";
 import { Modal, SignalDetail, SignalRow } from "./UI";
@@ -15,7 +14,8 @@ export function SignalRows({
   status?: string;
   search?: string;
 }) {
-  const signals = useStore((s) => s.signals).filter(
+  const allSignals = useStore((s) => s.signals),
+    signals = allSignals.filter(
       (s) =>
         (!symbol || symbol === "all" || s.symbol === symbol) &&
         (!status || status === "all" || s.status === status) &&
@@ -23,30 +23,31 @@ export function SignalRows({
           .toLowerCase()
           .includes(search.toLowerCase()),
     ),
-    [selected, setSelected] = useState<Signal | null>(null),
+    [selectedId, setSelectedId] = useState<string | null>(null),
+    selected = allSignals.find((signal) => signal.id === selectedId),
     t = useT();
   return (
     <>
       {signals.length ? (
         <div className="signal-table-wrap">
-          <table className="signal-table">
-            <thead>
-              <tr>
-                <th>Aset / TF</th>
-                <th>Arah</th>
-                {!compact && <th>Entry / SL</th>}
-                <th>RR</th>
-                <th>Status</th>
-                <th />
+          <table className="signal-table" role="table" aria-label={t.signals}>
+            <thead role="rowgroup">
+              <tr role="row">
+                <th role="columnheader">Aset / TF</th>
+                <th role="columnheader">Arah</th>
+                {!compact && <th role="columnheader">Entry / SL</th>}
+                <th role="columnheader">RR</th>
+                <th role="columnheader">Status</th>
+                <th role="columnheader" aria-label={t.selected} />
               </tr>
             </thead>
-            <tbody>
+            <tbody role="rowgroup">
               {signals.slice(0, compact ? 2 : undefined).map((s) => (
                 <SignalRow
                   key={s.id}
                   signal={s}
                   compact={compact}
-                  onClick={() => setSelected(s)}
+                  onClick={() => setSelectedId(s.id)}
                 />
               ))}
             </tbody>
@@ -61,7 +62,7 @@ export function SignalRows({
       {selected && (
         <Modal
           title={`${selected.symbol} · ${selected.tf}`}
-          onClose={() => setSelected(null)}
+          onClose={() => setSelectedId(null)}
         >
           <SignalDetail signal={selected} />
         </Modal>

@@ -38,10 +38,16 @@ export default function ChartPage() {
     symbol = raw?.toUpperCase() as Symbol,
     navigate = useNavigate(),
     demo = useStore((s) => s.demo),
+    language = useStore((s) => s.settings.language),
     quotes = useStore((s) => s.quotes),
     signals = useStore((s) => s.signals),
     [tf, setTf] = useState<Timeframe>("H1"),
     [candles, setCandles] = useState<Candle[]>([]),
+    [health, setHealth] = useState<{
+      sources: string[];
+      gapCount: number | null;
+      recoveryJobs: number;
+    } | null>(null),
     [error, setError] = useState(""),
     [indicators, setIndicators] = useState(["EMA", "Volume", "Sinyal"]),
     [alertOpen, setAlertOpen] = useState(false),
@@ -57,16 +63,20 @@ export default function ChartPage() {
     if (!symbols.includes(symbol)) return;
     setError("");
     setCandles([]);
+    setHealth(null);
     if (demo) {
       setCandles(demoCandles(symbol, tf));
       return;
     }
     let alive = true;
     const load = () =>
-      api<{ candles: Candle[] }>(`/market/${symbol}/candles?tf=${tf}&limit=300`)
+      api<{ candles: Candle[]; health?: NonNullable<typeof health> }>(
+        `/market/${symbol}/candles?tf=${tf}&limit=300`,
+      )
         .then((d) => {
           if (alive) {
             setError("");
+            setHealth(d.health ?? null);
             setCandles(
               applyQuote(
                 d.candles,
@@ -247,6 +257,7 @@ export default function ChartPage() {
             <MarketChart
               key={`${symbol}-${tf}`}
               candles={candles}
+              timeframe={tf}
               indicators={indicators}
               signals={chosen}
               onPrice={onPrice}
@@ -260,6 +271,18 @@ export default function ChartPage() {
               ? "Memuat candle…"
               : "Candle belum tersedia. Hubungkan sumber data di Pengaturan → API."}
           </div>
+        )}
+        {health && ((health.gapCount ?? 0) > 0 || health.recoveryJobs > 0) && (
+          <p className="callout" role="status">
+            {language === "id" ? "Histori belum lengkap" : "History incomplete"}
+            : {health.gapCount ?? "—"}{" "}
+            {language === "id" ? "candle hilang" : "missing candles"} ·{" "}
+            {health.recoveryJobs}{" "}
+            {language === "id"
+              ? "job pemulihan; lihat Histori & backfill"
+              : "recovery jobs; see History & backfill"}
+            .
+          </p>
         )}
         <div className="chart-footer">
           <span>

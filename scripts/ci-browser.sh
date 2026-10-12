@@ -51,3 +51,9 @@ PY
 python tests/browser_smoke.py
 python tests/meeting_smoke.py
 python tests/alert_smoke.py
+
+python tests/lifecycle_smoke.py
+
+python tests/mobile_design_smoke.py
+
+python tests/scene_smoke.py

@@ -1,4 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import VoteAttempts from "../components/VoteAttempts";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Activity,
@@ -121,6 +122,7 @@ export function StaffPanel() {
             <small>{vote.latency} ms</small>
           </div>
           <p className="analysis-text">{vote.reason}</p>
+          <VoteAttempts vote={vote} />
           <p className="muted">
             {vote.model} · {vote.provider}
           </p>
@@ -214,6 +216,8 @@ export default function Office() {
     [stats, setStats] = useState<RenderStats | null>(null),
     playback = useOfficeMeeting(),
     [expanded, setExpanded] = useState(false),
+    panelRef = useRef<HTMLElement>(null),
+    expandRef = useRef<HTMLButtonElement>(null),
     [timer, setTimer] = useState(0);
   useEffect(() => {
     const tick = () => setTimer(300 - (Math.floor(Date.now() / 1000) % 300));
@@ -221,6 +225,41 @@ export default function Office() {
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, []);
+  useEffect(() => {
+    if (!expanded) return;
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    expandRef.current?.focus();
+    const key = (event: KeyboardEvent) => {
+      if (document.querySelector("dialog[open]")) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setExpanded(false);
+      }
+      if (event.key === "Tab") {
+        const controls = Array.from(
+          panelRef.current?.querySelectorAll<HTMLElement>(
+            "button:not(:disabled),select,input",
+          ) ?? [],
+        ).filter((element) => element.getClientRects().length);
+        const first = controls[0],
+          last = controls.at(-1);
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last?.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", key);
+      expandRef.current?.focus();
+    };
+  }, [expanded]);
   const meeting = meetings[0];
   useEffect(() => {
     if (follow && playback.frame)
@@ -259,6 +298,10 @@ export default function Office() {
       {!publicView && <MarketOverview />}
       <div className="office-layout">
         <section
+          ref={panelRef}
+          role={expanded ? "dialog" : undefined}
+          aria-modal={expanded || undefined}
+          aria-label={expanded ? t.office : undefined}
           className={`office-panel panel ${expanded ? "office-expanded" : ""}`}
         >
           <div className="panel-heading">
@@ -269,6 +312,7 @@ export default function Office() {
             </div>
             <button
               className="icon-button"
+              ref={expandRef}
               onClick={() => setExpanded(!expanded)}
               aria-label={expanded ? "Tutup layar penuh" : "Perbesar kantor"}
             >
@@ -360,7 +404,14 @@ export default function Office() {
               </select>
             </div>
             {stats && !mode2d && (
-              <span className="render-stats" aria-label="Statistik render">
+              <span
+                className="render-stats"
+                aria-label="Statistik render"
+                data-draw-calls={stats.drawCalls}
+                data-triangles={stats.triangles}
+                data-textures={stats.textures}
+                data-characters={stats.characters}
+              >
                 {quality === "auto" ? "AUTO · " : ""}
                 {stats.quality.toUpperCase()} ·{" "}
                 {stats.paused
@@ -373,8 +424,11 @@ export default function Office() {
               </span>
             )}
             <div className="scene-hint">
-              <span>
+              <span className="orbit-hint-desktop">
                 <Crosshair size={13} /> Geser untuk orbit · scroll untuk zoom
+              </span>
+              <span className="orbit-hint-mobile">
+                <Crosshair size={13} /> Geser untuk orbit · cubit untuk zoom
               </span>
               <span>
                 <Users size={13} /> 11 inti + 2 pendukung

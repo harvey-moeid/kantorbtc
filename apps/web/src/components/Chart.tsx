@@ -9,7 +9,12 @@ import {
   type IPriceLine,
   type UTCTimestamp,
 } from "lightweight-charts";
-import type { Candle, Signal } from "../../../../packages/shared/src/domain";
+import {
+  seconds,
+  type Candle,
+  type Signal,
+  type Timeframe,
+} from "../../../../packages/shared/src/domain";
 import {
   ema,
   bollinger,
@@ -27,8 +32,10 @@ export default function MarketChart({
   onPrice,
   alerts = [],
   onAlertEdit,
+  timeframe = "H1",
 }: {
   candles: Candle[];
+  timeframe?: Timeframe;
   indicators: string[];
   signals: Signal[];
   onPrice?: (price: number) => void;
@@ -63,27 +70,28 @@ export default function MarketChart({
     const chart = createChart(container.current, {
       autoSize: true,
       layout: {
-        background: { type: ColorType.Solid, color: "#161a17" },
-        textColor: "#88918a",
+        background: { type: ColorType.Solid, color: "#111a21" },
+        textColor: "#a3b5c0",
+        fontSize: 12,
         fontFamily: "DM Sans",
         attributionLogo: false,
       },
       grid: {
-        vertLines: { color: "#232a24" },
-        horzLines: { color: "#232a24" },
+        vertLines: { color: "#27333c" },
+        horzLines: { color: "#27333c" },
       },
       crosshair: {
-        vertLine: { color: "#93a17b" },
-        horzLine: { color: "#93a17b" },
+        vertLine: { color: "#b9d7c3" },
+        horzLine: { color: "#b9d7c3" },
       },
       rightPriceScale: {
-        borderColor: "#2a322b",
+        borderColor: "#34434c",
         scaleMargins: { top: 0.12, bottom: 0.24 },
       },
       timeScale: {
         timeVisible: true,
         secondsVisible: false,
-        borderColor: "#2a322b",
+        borderColor: "#34434c",
       },
     });
     const updaters: ((data: Candle[]) => void)[] = [],
@@ -97,10 +105,10 @@ export default function MarketChart({
           value: values[i],
         }));
     const candleSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#b6d885",
-      downColor: "#d08673",
-      wickUpColor: "#b6d885",
-      wickDownColor: "#d08673",
+      upColor: "#bdddac",
+      downColor: "#e29a88",
+      wickUpColor: "#bdddac",
+      wickDownColor: "#e29a88",
       borderVisible: false,
     });
     const alertLines = new Map<string, IPriceLine>();
@@ -331,9 +339,47 @@ export default function MarketChart({
           ? previous
           : nextHandles,
       );
-      for (const z of indicators.includes("SMC")
-        ? structure(dataRef.current, settings.swing).zones
-        : []) {
+      const closed = dataRef.current.filter(
+        (c) => c.time + seconds[timeframe] <= Date.now() / 1000,
+      );
+      const smc = indicators.includes("SMC")
+        ? structure(closed, settings.swing)
+        : null;
+      for (const level of smc?.levels ?? []) {
+        const y = candleSeries.priceToCoordinate(level.price);
+        const x = level.from
+          ? chart.timeScale().timeToCoordinate(level.from as UTCTimestamp)
+          : 0;
+        if (y === null) continue;
+        const left = Math.max(0, x ?? 0),
+          right = width - chart.priceScale("right").width();
+        ctx.strokeStyle = level.type === "CHoCH" ? "#e4ba75" : "#8ca496";
+        ctx.setLineDash(level.type === "LIQUIDITY" ? [3, 4] : [7, 3]);
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(right, y);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = "#a4b396";
+        ctx.font = "10px DM Sans";
+        ctx.fillText(level.type, left + 5, y - 5);
+      }
+      if (smc?.premiumDiscount) {
+        const range = smc.premiumDiscount,
+          y = candleSeries.priceToCoordinate(range.midpoint);
+        if (y !== null) {
+          ctx.strokeStyle = "#6b8791";
+          ctx.setLineDash([2, 5]);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(width - chart.priceScale("right").width(), y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillStyle = "#8ca496";
+          ctx.fillText("PREMIUM / DISCOUNT 50%", 5, y - 5);
+        }
+      }
+      for (const z of smc?.zones ?? []) {
         const a = candleSeries.priceToCoordinate(z.high),
           b = candleSeries.priceToCoordinate(z.low),
           x = chart.timeScale().timeToCoordinate(z.from as UTCTimestamp);
@@ -441,6 +487,7 @@ export default function MarketChart({
     settings.emaSlow,
     settings.rsiPeriod,
     settings.swing,
+    timeframe,
   ]);
   useEffect(() => {
     updateRef.current?.(candles);

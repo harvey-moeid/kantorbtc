@@ -56,6 +56,28 @@ describe("deterministic risk and approval engine", () => {
     );
     expect(decide(votes, demoScanner).reason).toContain("kuorum");
   });
+  it("never uses a failed vote to manufacture a two-two tie-breaker", () => {
+    const votes = structuredClone(demoVotes);
+    votes[2] = {
+      ...votes[2],
+      direction: "short",
+      levels: { entry: [67400, 67480], sl: 67800, tp: [66600] },
+    };
+    votes[3] = { ...votes[3], direction: "abstain", levels: null };
+    expect(
+      decide(votes, demoScanner, { ...defaultSettings, tieMargin: 40 })
+        .approved,
+    ).toBe(false);
+  });
+  it("accepts three directional votes even when the fourth slot abstains", () => {
+    const votes = structuredClone(demoVotes);
+    votes[3] = { ...votes[3], direction: "abstain", levels: null };
+    expect(decide(votes, demoScanner)).toMatchObject({
+      approved: true,
+      tieBreaker: false,
+      direction: "long",
+    });
+  });
   it("requires exactly four slots", () =>
     expect(decide(demoVotes.slice(0, 3), demoScanner).approved).toBe(false));
   it("does not silently choose an unset tie-breaker margin", () => {
@@ -71,7 +93,10 @@ describe("deterministic risk and approval engine", () => {
               tp: [66600],
             },
     }));
-    expect(decide(votes, demoScanner).approved).toBe(false);
+    expect(
+      decide(votes, demoScanner, { ...defaultSettings, tieMargin: null })
+        .approved,
+    ).toBe(false);
     expect(
       decide(votes, demoScanner, { ...defaultSettings, tieMargin: 30 }),
     ).toMatchObject({ approved: true, tieBreaker: true, direction: "long" });
@@ -114,14 +139,14 @@ describe("deterministic risk and approval engine", () => {
     votes[0].levels!.tp = [68280];
     expect(decide(votes, demoScanner).levels!.tp).toEqual([68280]);
   });
-  it("does not invent a signal lifetime", () => {
+  it("does not publish when admin explicitly clears a lifetime", () => {
     expect(
       makeSignal(
         "BTCUSDT",
         "H1",
         demoVotes,
         demoScanner,
-        defaultSettings,
+        { ...defaultSettings, ttl: { ...defaultSettings.ttl, H1: null } },
         "OKX",
         1000,
       ),
@@ -153,21 +178,21 @@ describe("observed tick lifecycle", () => {
     expect(
       advanceSignal(demoSignals[0], 68000, demoSignals[0].createdAt).status,
     ).toBe("menunggu_entry"));
-  it("records intermediate targets without closing early", () => {
+  it("closes immediately at TP1 while recording the observed target", () => {
     const s = { ...demoSignals[0], status: "aktif" as const, expiresAt: null };
     expect(advanceSignal(s, 68300, 1000)).toMatchObject({
-      status: "aktif",
+      status: "target_tercapai",
       hitTargets: [1],
     });
   });
-  it("closes on final target", () =>
+  it("closes at TP1 even when a tick jumps past additional targets", () =>
     expect(
       advanceSignal(
         { ...demoSignals[0], status: "aktif", expiresAt: null },
         70000,
         1000,
       ),
-    ).toMatchObject({ status: "target_tercapai", hitTargets: [1, 2, 3] }));
+    ).toMatchObject({ status: "target_tercapai", hitTargets: [1] }));
   it("closes on stop loss", () =>
     expect(
       advanceSignal(
@@ -180,6 +205,21 @@ describe("observed tick lifecycle", () => {
     expect(
       advanceSignal({ ...demoSignals[0], expiresAt: 1000 }, 67440, 1000).status,
     ).toBe("kedaluwarsa"));
+  it("stops the expiry countdown after entry while retaining the deadline for audit", () => {
+    const waiting = { ...demoSignals[0], expiresAt: 2000 };
+    const active = advanceSignal(waiting, 67440, 1000);
+    expect(active).toMatchObject({
+      status: "aktif",
+      expiresAt: 2000,
+      entryTouchedAt: 1000,
+    });
+    expect(advanceSignal(active, 68300, 5000)).toMatchObject({
+      status: "target_tercapai",
+      hitTargets: [1],
+    });
+    expect(advanceSignal(active, 70000, 6000).status).toBe("target_tercapai");
+    expect(advanceSignal(active, 67000, 6000).status).toBe("stop_loss");
+  });
   it("never changes a terminal signal", () =>
     expect(advanceSignal(demoSignals[2], 99999, 1000)).toBe(demoSignals[2]));
 });

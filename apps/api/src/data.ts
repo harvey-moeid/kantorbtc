@@ -1,9 +1,11 @@
 import {
   defaultSettings,
+  settingsSchema,
   type Settings,
 } from "../../../packages/shared/src/domain";
 import type { Env, Slot } from "./env";
 import { defaultSlots } from "./env";
+import { aiSettingsSchema } from "../../../packages/shared/src/ai-config";
 import { decrypt } from "./security";
 export async function settings(
   env: Env,
@@ -12,14 +14,19 @@ export async function settings(
     "SELECT value_json,version FROM settings WHERE id='scanner'",
   ).first<{ value_json: string; version: number }>();
   return row
-    ? { settings: JSON.parse(row.value_json), version: row.version }
+    ? {
+        settings: settingsSchema.parse(JSON.parse(row.value_json)),
+        version: row.version,
+      }
     : { settings: structuredClone(defaultSettings), version: 1 };
 }
 export async function slots(env: Env): Promise<Slot[]> {
   const row = await env.DB.prepare(
     "SELECT value_json FROM settings WHERE id='ai'",
   ).first<{ value_json: string }>();
-  return row ? JSON.parse(row.value_json) : defaultSlots;
+  return row
+    ? aiSettingsSchema.parse({ slots: JSON.parse(row.value_json) }).slots
+    : structuredClone(defaultSlots);
 }
 export async function credential(
   env: Env,

@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Search, ShieldCheck } from "lucide-react";
 import { symbols } from "../../../../packages/shared/src/domain";
 import { useT } from "../i18n";
-import { PageTitle, statusLabels } from "../components/UI";
+import { PageTitle, useStatusLabels } from "../components/UI";
 import { SignalRows } from "../components/SignalRows";
 export default function Signals() {
   const [symbol, setSymbol] = useState("all"),
     [status, setStatus] = useState("all"),
     [search, setSearch] = useState(""),
-    t = useT();
+    t = useT(),
+    statusLabels = useStatusLabels();
   return (
     <>
       <PageTitle

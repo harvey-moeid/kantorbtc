@@ -8,6 +8,10 @@ import {
 export interface RenderStats {
   quality: RenderQuality;
   fps: number | null;
+  drawCalls?: number;
+  triangles?: number;
+  textures?: number;
+  characters?: number;
   paused: boolean;
   onDemand?: boolean;
 }
@@ -34,7 +38,7 @@ export default function RenderMonitor({
       fastSeconds: 0,
       lastChange: -15,
     });
-  useFrame((_renderer, delta) => {
+  useFrame(({ gl, scene }, delta) => {
     if (document.hidden || delta <= 0 || delta > 1) return;
     duration.current += delta;
     time.current += delta;
@@ -61,7 +65,15 @@ export default function RenderMonitor({
         onFallback();
       }
     }
+    let characters = 0;
+    scene.traverse((object) => {
+      if (object.name.startsWith("staff-")) characters++;
+    });
     onStats({
+      drawCalls: gl.info.render.calls,
+      triangles: gl.info.render.triangles,
+      textures: gl.info.memory.textures,
+      characters,
       quality: automatic ? state.current.level : quality,
       fps,
       paused: false,

@@ -3057,3 +3057,18 @@ h1 {
     min-height: 30px;
   }
 }
+
+.signal-audit {
+  overflow-wrap: anywhere;
+}
+.signal-audit li {
+  margin-bottom: 12px;
+  color: var(--muted);
+}
+.signal-audit b {
+  color: var(--text);
+}
+
+.signal-status.ambigu {
+  color: #e4ba75;
+}

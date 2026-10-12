@@ -1,3 +1,5 @@
+import CotContext from "../components/CotContext";
+import VoteAttempts from "../components/VoteAttempts";
 import { useState } from "react";
 import {
   Activity,
@@ -117,10 +119,13 @@ export default function Meetings() {
               </div>
             ))}
           </div>
+          {selected.symbol === "XAUUSD" && (
+            <CotContext context={selected.cot} />
+          )}
           <h3>Presentasi AI</h3>
           {selected.votes.length ? (
-            selected.votes.map((v) => (
-              <div className="presentation" key={v.provider}>
+            selected.votes.map((v, index) => (
+              <div className="presentation" key={index}>
                 <div>
                   <Sparkles size={18} />
                   <b>{v.provider}</b>
@@ -129,6 +134,7 @@ export default function Meetings() {
                   </Badge>
                 </div>
                 <p>{v.reason}</p>
+                <VoteAttempts vote={v} />
               </div>
             ))
           ) : (

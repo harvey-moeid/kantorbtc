@@ -15,9 +15,11 @@ interface Job {
   rows_saved: number;
   error: string | null;
   updated_at: number;
+  kind?: "initial" | "manual" | "recovery";
 }
 export default function DataOperations() {
   const demo = useStore((s) => s.demo),
+    language = useStore((s) => s.settings.language),
     [jobs, setJobs] = useState<Job[]>([]),
     [symbol, setSymbol] = useState<Symbol>("BTCUSDT"),
     [from, setFrom] = useState("2025-10-11"),
@@ -135,6 +137,11 @@ export default function DataOperations() {
                   <b>
                     {j.symbol} / {j.tf}
                   </b>
+                  {j.kind === "recovery" && (
+                    <Badge>
+                      {language === "id" ? "PEMULIHAN GAP" : "GAP RECOVERY"}
+                    </Badge>
+                  )}
                   <Badge
                     tone={
                       j.status === "complete"

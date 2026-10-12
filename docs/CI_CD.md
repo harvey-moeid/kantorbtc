@@ -5,7 +5,7 @@ Workflow [Kantor CI/CD](../.github/workflows/ci.yml) berjalan pada push, pull re
 ## CI
 
 1. Job **Format, tests and build** memasang dependency dengan frozen lockfile, memeriksa format, menjalankan Vitest, membangun frontend beserta typecheck, dan memeriksa packaging Worker lewat Wrangler dry run tanpa account/token. Build disimpan sebagai artifact `frontend-<commit SHA>` selama tujuh hari.
-2. Job **Desktop and mobile smoke tests** memakai artifact yang sama, memasang Chromium Playwright, menerapkan empat migrasi D1 pada database sementara, dan menjalankan ketiga smoke test. Runner `scripts/ci-browser.sh` menunggu respons health demo dan menghentikan proses miliknya setelah selesai/gagal. Screenshot dan log server di `test-results/` diunggah juga saat test gagal.
+2. Job **Desktop and mobile smoke tests** memakai artifact yang sama, memasang Chromium Playwright, menerapkan seluruh migrasi D1 (saat ini sembilan) pada database sementara, dan menjalankan keenam smoke test. Runner `scripts/ci-browser.sh` menunggu respons health demo dan menghentikan proses miliknya setelah selesai/gagal. Screenshot dan log server di `test-results/` diunggah juga saat test gagal.
 3. Job **Deploy Cloudflare** hanya berjalan setelah dua job tersebut berhasil, pada ref `main`, dan jika repository variable `CLOUDFLARE_DEPLOY_ENABLED=true`. Pull request dan branch fitur tidak menjalankan deployment.
 
 Tambahkan kedua job CI sebagai required status checks pada aturan branch `main` di GitHub setelah workflow tersedia. Deploy dari push `main` memilih staging; pemicu manual dapat memilih staging atau production. Pilih ref `main` ketika menjalankan pemicu manual. Pemicu manual baru tersedia setelah workflow digabung ke default branch.

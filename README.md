@@ -50,7 +50,7 @@ Masukkan password di terminal (tidak ditampilkan). Script membuat `.dev.vars` de
 - Scene prosedural React Three Fiber: dua lantai, 4 analis scanner, 4 analis AI, 2 RR, bos, serta IT/resepsionis. Ruang meeting dan RR berada di lantai 2; pantry dan musolla di lantai 1. Orbit, zoom, pemilihan lantai, kualitas, dan fallback 2D.
 - Klik karakter untuk analisis; klik monitor untuk chart. Karakter berjalan melalui tangga menuju kursi rapat, menyampaikan scanner → empat AI → RR → bos, lalu kembali bekerja. Keputusan yang sudah tersimpan menjadi sumber presentasi; replay tidak memanggil AI lagi. Kamera mengikuti pembicara, dengan override manual, jeda, seek, kecepatan, dan pilihan rekaman.
 - Rutinitas staf bekerja, pantry, dan musolla dengan batas pengunjung. Auto quality menyesuaikan FPS, Low tetap menampilkan semua 11 staf inti dan lantai 2, serta fallback 2D pada performa sangat rendah. Tab tersembunyi menghentikan render/presentasi; preferensi reduced motion menggunakan render sesuai kebutuhan.
-- Chart candlestick 5m/15m/H1/H4/D1, EMA, Bollinger Bands, RSI, MACD, ATR, volume, zona SMC awal, dan garis entry/SL/TP.
+- Chart candlestick 5m/15m/H1/H4/D1, EMA, Bollinger Bands, RSI, MACD, ATR, volume, BOS/CHoCH, likuiditas, garis premium/discount, serta zona FVG/order block, dan garis entry/SL/TP.
 - Daftar sinyal dengan filter, detail voting/level, sentuhan entry dan target yang tercatat; riwayat meeting dan alasan penolakan.
 - Pengaturan scanner/risiko, empat slot AI, koneksi API write-only, pengujian baca provider, alert harga, dan progres backfill.
 - Tema gelap, tata letak ponsel, mode non-3D, dan navigasi inti Indonesia/Inggris.
@@ -60,18 +60,21 @@ Masukkan password di terminal (tidak ditampilkan). Script membuat `.dev.vars` de
 Satu Cloudflare Worker melayani Hono API dan aset statis Vite, sesuai alternatif deployment pada PRD. D1 menyimpan candle, settings berversi/audit, sesi, credential ciphertext, meeting, sinyal/status, alert/outbox, failover, derivatives, dan cursor backfill. Durable Object `MarketHub` membagi koneksi upstream dan event ke klien.
 
 - BTC: WebSocket OKX → Binance → Bybit; REST fallback untuk startup atau upstream tidak tersedia. Primary harus stabil dua menit sebelum koneksi stream kembali dari fallback.
-- Emas: OANDA REST pricing/candles → Twelve Data. OANDA menggunakan `OANDA_ACCOUNT_ID`; `OANDA_ENV=practice` default, atau `live`. Status stale/closed ditampilkan. Polling emas 15 detik, **belum streaming OANDA**.
-- Derivatives: funding/OI publik OKX, perubahan OI dibanding snapshot sebelumnya. XAU-USDT-SWAP hanya digunakan jika kontrak benar-benar tersedia; jika tidak, abstain. COT dan fallback derivatives multi-exchange belum dibuat.
-- Scanner pada candle close tiap 5 menit. Syarat dua kelompok searah tetap dapat memicu AI walau ada dua kelompok berlawanan. AI dipanggil paralel, satu retry, lalu abstain jika gagal. Adapter disediakan untuk Workers AI, Gemini, Groq, OpenRouter, Mistral, Hugging Face, Cohere, NVIDIA.
+- Emas: OANDA pricing stream + REST/candles → Twelve Data. OANDA menggunakan `OANDA_ACCOUNT_ID`; `OANDA_ENV=practice` default, atau `live`. Status stale/closed ditampilkan. Stream NDJSON dengan heartbeat, batas ukuran pesan, reconnect/backoff, rotasi koneksi 10 menit, dan fallback REST saat stream tidak tersedia. Pemulihan dari Twelve Data menunggu OANDA stabil dua menit lewat stream/REST; status pasar tutup tidak diperlakukan sebagai stale. Integrasi akun nyata belum diverifikasi.
+- Derivatives: funding/OI publik OKX → Binance → Bybit. OI hanya dibanding snapshot exchange yang sama, berumur 4–30 menit; perpindahan sumber tanpa baseline menghasilkan abstain. Proxy XAUUSDT hanya digunakan setelah metadata mengonfirmasi kontrak perpetual aktif. COT CFTC Disaggregated Futures Only untuk COMEX gold (088691) tersimpan di D1 dan menjadi konteks meeting AI saja; scanner tidak berubah. Pemeriksaan tiap 6 jam mengikuti cron live, dengan snapshot laporan/freshness pada meeting. Posisi stale/unavailable tidak dikirim ke AI; tanggal posisi dibedakan dari tanggal rilis. Akses endpoint CFTC langsung belum diverifikasi di lingkungan ini.
+- Scanner pada candle close tiap 5 menit. Syarat dua kelompok searah tetap dapat memicu AI walau ada dua kelompok berlawanan. Empat slot AI dipanggil paralel; setiap provider memiliki timeout 12 detik dan satu retry, lalu pindah ke maksimal dua provider/model cadangan yang dikonfigurasi. Hasil akhir tetap satu suara per slot; riwayat percobaan tersimpan bersama voting dan terlihat pada detail, tanpa error body atau kredensial. Semua gagal menghasilkan abstain. Adapter disediakan untuk Workers AI, Gemini, Groq, OpenRouter, Mistral, Hugging Face, Cohere, NVIDIA.
 - RR deterministik pada TP1 menggunakan entry terburuk. Mayoritas 3/4, atau 2–2 dengan scanner lebih kuat dan margin yang dikonfigurasi; satu SL, 1–3 TP. Level mayoritas digabung dengan median. Tidak ada endpoint order.
 - Backfill awal satu tahun untuk kedua aset/lima timeframe dibuat ketika cron live pertama berjalan. Job berjalan satu halaman per alarm dan dapat dilanjutkan setelah gagal. Cakupan histori aktual bergantung provider.
+- Gap recovery: pembaruan menjadwalkan rentang histori yang terlewat, termasuk lubang pada candle BTC. Job memiliki ID deterministik, diprioritaskan sebelum backfill awal, dan dapat dilanjutkan dari cursor. Scanner BTC menolak histori yang stale/tidak kontinu sesuai lookback indikator; chart menampilkan gap dan jumlah job recovery. Jeda sesi emas tidak dianggap gap internal tanpa kalender provider.
+- Volume emas: jika candle spot tidak menyediakan volume, cari candle perpetual dari OKX/Binance/Bybit hanya setelah kontrak aktif diverifikasi. Seri harus closed, fresh dan selaras dengan waktu candle spot; jika tidak tersedia, abstain. Harga spot tetap berasal dari broker. OANDA H4/D1 disejajarkan UTC.
+- Audit sinyal: halaman detail mengambil ledger privat dengan pagination yang stabil pada timestamp sama; menunjukkan jeda/resume jam entry, entry/TP1/SL, pembatalan, dan hasil ambigu. Demo tidak mengarang audit backend.
 - Outbox Discord: retry dengan backoff, batas percobaan, dedup per signal/alert, tanpa mention Discord. Delivery belum diuji terhadap channel nyata.
 
 ## Aturan PRD yang masih terbuka
 
-`tieMargin` dan `ttl` per timeframe **kosong secara default**. Tie-breaker nonaktif sampai margin dipilih; sinyal live tidak diterbitkan untuk timeframe tanpa TTL. Nilai durasi contoh pada demo bukan keputusan pengguna.
+`tieMargin` default **40** sudah dikonfirmasi pada 12 Oktober 2026. Migrasi `0008` mengisi null/missing dan mencatat audit tanpa menimpa override numerik. TTL telah dikonfirmasi **opsi A** pada 12 Oktober 2026: 15 menit / 45 menit / 3 jam / 12 jam / 3 hari untuk 5m/15m/H1/H4/D1. Durasi hanya membatasi menunggu entry dan berhenti setelah entry tersentuh. Migrasi `0006` mengisi konfigurasi lama yang kosong, mempertahankan override numerik, dan mencatat audit. Admin masih dapat mengosongkan TTL untuk menonaktifkan publikasi pada timeframe tersebut.
 
-Untuk implementasi awal, sinyal hanya dianggap masuk ketika **tick yang teramati** berada dalam zona; tidak mengarang sentuhan dari candle atau gap sampling. TTL tetap berjalan setelah entry dan saat pasar tutup. TP1/TP2 dicatat, lalu sinyal selesai saat TP terakhir; SL dapat mengakhiri sinyal lebih dahulu. Ini adalah **kebijakan implementasi sementara**, bukan keputusan final PRD. Pembatalan struktur dan sinyal berlawanan belum diaktifkan. Definisi SMC awal dijelaskan pada `packages/shared/src/structure.ts` dan perlu dikunci sebelum produksi.
+Untuk implementasi awal, sinyal hanya dianggap masuk ketika **tick yang teramati** berada dalam zona; tidak mengarang sentuhan dari candle atau gap sampling. BTC memakai deadline kalender; emas memakai budget waktu pasar buka yang tersimpan, dijeda saat provider menyatakan tutup atau status/freshness tidak diketahui. Hitung mundur berhenti setelah entry. Sinyal selesai pada **TP1**, atau SL jika tick yang teramati menunjukkan SL terlebih dahulu. Sinyal berlawanan membatalkan hanya yang menunggu entry pada aset/timeframe sama; lintas timeframe berjalan mandiri dengan peringatan. Pembatalan struktur otomatis nonaktif sesuai pilihan pemilik. Candle TP1/SL tanpa urutan tick menghasilkan status **ambigu**, tidak diputuskan dari tick yang datang setelah gap. Audit harga sebelumnya tetap dipertahankan. Definisi SMC/ICT yang dikonfirmasi digunakan bersama oleh scanner/chart, tanpa memakai pivot sebelum candle kanan close.
 
 ## Validasi
 
@@ -87,11 +90,12 @@ Tes memeriksa aturan voting/RR, tie-breaker, kuorum, abstain, status tick, indik
 python tests/browser_smoke.py
 python tests/meeting_smoke.py
 python tests/alert_smoke.py
+python tests/lifecycle_smoke.py
 ```
 
 Jalankan kedua server sebelum smoke browser. Screenshot disimpan di `test-results/`, yang diabaikan Git. Tes browser memeriksa privasi publik, perpindahan lantai, karakter, chart/indikator, alert, filter, detail sinyal/meeting, pengaturan, bahasa, dan responsivitas 390 px. Smoke alert memeriksa edit numerik, validasi harga, drag desktop/sentuhan ponsel, batal/konfirmasi, keyboard, isolasi aset, dan bahwa demo tidak mengirim perubahan ke API privat.
 
-161 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
+318 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
 
 Alert aktif yang belum terpicu ditampilkan sebagai garis pada chart. Geser pegangan garis untuk memilih level baru lalu konfirmasikan di formulir, atau gunakan tombol **Ubah alert** untuk mengisi harga langsung. Enter/Space pada pegangan membuka editor yang sama. Menutup formulir mempertahankan level tersimpan. Alert terpicu/nonaktif tidak bisa diedit atau diaktifkan ulang melalui perubahan harga; buat alert baru bila diperlukan. Mode demo hanya mengubah state sesi lokal, sedangkan workspace privat menyimpan perubahan di D1.
 
@@ -105,6 +109,8 @@ Worker live juga diperiksa dengan konfigurasi dan database sementara terpisah, t
 
 ## Deployment Cloudflare
 
+Panduan langkah demi langkah tersedia di [Deploy produksi dan setting live](docs/DEPLOY_PRODUKSI_DAN_LIVE.md), termasuk secret, provider, aktivasi cron, acceptance, keterbatasan CI/CD saat ini dan rollback.
+
 Pipeline GitHub Actions untuk CI, smoke browser, dan deployment staging/produksi dijelaskan di [panduan CI/CD](docs/CI_CD.md). CD membutuhkan konfigurasi GitHub Environments dan repository variable `CLOUDFLARE_DEPLOY_ENABLED=true`; production dipicu manual. Kedua target mulai dalam mode demo.
 
 Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
@@ -116,3 +122,7 @@ Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 5. Uji koneksi baca provider di UI, histori/pagination, stream/failover, quorum/timeout, outbox, dan performa di perangkat target. Cloudflare Workers websocket port dan endpoint provider perlu diuji pada akun deployment.
 
 Subdomain `muidsoft.com` dapat dipasang setelah pemilik menentukan nama dan memberikan akses DNS. Deployment aplikasi dan perubahan DNS dilakukan terpisah dari penyimpanan kode di GitHub.
+
+Frontend telah diperbarui menjadi mobile first: navigasi bawah lima halaman, kartu sinyal pada ponsel, scanner satu kolom, kontrol sentuh 44 px, drawer keyboard/Escape, dialog bernama, dan tema graphite/mint yang konsisten dengan chart. Smoke desain memeriksa 320/360/390/430 px, tablet 768 px serta desktop 1440 px; seluruh enam smoke browser lulus. Rincian temuan dan batas audit tersedia di `docs/FRONTEND_AUDIT.md`.
+
+Kantor 3D mendapat pembaruan material/pencahayaan, furniture, detail karakter, framing kamera per floor/aspect, shared monitor texture dan geometry instancing. Semua profil mempertahankan 13 karakter; scene berhenti di luar viewport dan fullscreen mendukung keyboard. Review dan biaya render tersedia di `docs/3D_AUDIT.md`; performa perangkat fisik belum diukur.

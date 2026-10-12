@@ -13,7 +13,7 @@ export async function fetchJson<T>(
 ): Promise<T> {
   const response = await fetch(url, {
     ...init,
-    signal: AbortSignal.timeout(12000),
+    signal: init?.signal ?? AbortSignal.timeout(12000),
   });
   if (!response.ok) throw new Error(`Provider HTTP ${response.status}`);
   return response.json<T>();
@@ -167,7 +167,7 @@ export async function marketCandles(
           mid: { o: string; h: string; l: string; c: string };
         }[];
       }>(
-        `https://${host}/v3/instruments/XAU_USD/candles?granularity=${oandaBars[tf]}&count=300&price=M${before ? "&to=" + encodeURIComponent(new Date(before * 1000).toISOString()) : ""}`,
+        `https://${host}/v3/instruments/XAU_USD/candles?granularity=${oandaBars[tf]}&count=300&price=M&dailyAlignment=0&alignmentTimezone=UTC${before ? "&to=" + encodeURIComponent(new Date(before * 1000).toISOString()) : ""}`,
         { headers: { Authorization: `Bearer ${oanda}` } },
       );
       const candles = normalized(
@@ -218,7 +218,11 @@ export async function marketCandles(
     "Emas belum tersedia. Konfigurasikan OANDA atau Twelve Data.",
   );
 }
-export async function marketQuote(env: Env, symbol: Symbol): Promise<Quote> {
+export async function marketQuote(
+  env: Env,
+  symbol: Symbol,
+  options: { skipOanda?: boolean } = {},
+): Promise<Quote> {
   const now = Date.now();
   if (symbol === "BTCUSDT") {
     try {
@@ -273,7 +277,7 @@ export async function marketQuote(env: Env, symbol: Symbol): Promise<Quote> {
     };
   }
   const key = await credential(env, "OANDA");
-  if (key && env.OANDA_ACCOUNT_ID)
+  if (key && env.OANDA_ACCOUNT_ID && !options.skipOanda)
     try {
       const host =
           env.OANDA_ENV === "live"

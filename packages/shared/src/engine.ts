@@ -1,3 +1,4 @@
+import { structure } from "./structure";
 import {
   defaultSettings,
   type Candle,
@@ -75,6 +76,11 @@ export function scan(
   candles: Candle[],
   derivatives?: Derivatives,
   settings = defaultSettings,
+  context: {
+    volumeCandles?: Candle[];
+    volumeSource?: string;
+    volumeIsProxy?: boolean;
+  } = {},
 ): Scan[] {
   if (
     candles.length <
@@ -94,19 +100,30 @@ export function scan(
     slow = ema(close, settings.emaSlow).at(-1)!,
     strength = rsi(close, settings.rsiPeriod).at(-1)!,
     volatility = atr(candles);
-  const prev = candles.slice(-settings.swing * 2 - 1, -1),
-    swingHigh = Math.max(...prev.map((c) => c.high)),
-    swingLow = Math.min(...prev.map((c) => c.low));
+  const prev = candles.slice(-settings.swing * 2 - 1, -1);
+  const analysis = structure(candles, settings.swing),
+    latestBreak = [...analysis.events]
+      .reverse()
+      .find((event) => event.at === last.time);
+  const latestHigh = [...analysis.pivots]
+      .reverse()
+      .find((pivot) => pivot.kind === "high"),
+    latestLow = [...analysis.pivots]
+      .reverse()
+      .find((pivot) => pivot.kind === "low");
+  const sweptLow =
+    !!latestLow && last.low < latestLow.price && last.close > latestLow.price;
+  const sweptHigh =
+    !!latestHigh &&
+    last.high > latestHigh.price &&
+    last.close < latestHigh.price;
   const smc: Direction =
-    last.close > swingHigh
+    latestBreak?.direction ??
+    (sweptLow && !sweptHigh
       ? "long"
-      : last.close < swingLow
+      : sweptHigh && !sweptLow
         ? "short"
-        : last.low < swingLow && last.close > swingLow
-          ? "long"
-          : last.high > swingHigh && last.close < swingHigh
-            ? "short"
-            : "netral";
+        : "netral");
   const momentum = macd(close).histogram.at(-1)!;
   const indicator: Direction =
     fast > slow && strength > 50 && strength < 75 && momentum > 0
@@ -114,20 +131,32 @@ export function scan(
       : fast < slow && strength < 50 && strength > 25 && momentum < 0
         ? "short"
         : "netral";
-  const averageVolume = prev.reduce((a, c) => a + c.volume, 0) / prev.length,
-    ratio = averageVolume > 0 ? last.volume / averageVolume : 0;
+  const volumeData = context.volumeCandles
+    ? context.volumeCandles.filter((c) => c.time <= last.time)
+    : candles;
+  const volumeLast = volumeData.at(-1),
+    volumePrevious = volumeData.slice(-settings.swing * 2 - 1, -1);
+  const aligned = volumeLast?.time === last.time;
+  const averageVolume =
+    aligned && volumePrevious.length === settings.swing * 2
+      ? volumePrevious.reduce((sum, c) => sum + c.volume, 0) /
+        volumePrevious.length
+      : 0;
+  const ratio =
+    averageVolume > 0 && volumeLast ? volumeLast.volume / averageVolume : 0;
   const scans: Scan[] = [
     {
       group: "smc",
       direction: smc,
       score: smc === "netral" ? 42 : 75,
       evidence: [
-        smc === "netral"
-          ? "Harga masih dalam rentang swing."
-          : last.close > swingHigh || last.close < swingLow
-            ? "Break of structure pada candle close."
-            : "Liquidity sweep dan kembali ke rentang.",
-        `Swing ${settings.swing} candle; definisi awal yang dapat dikonfigurasi.`,
+        latestBreak
+          ? `${latestBreak.type} pada candle close melewati swing terkonfirmasi ${latestBreak.price}.`
+          : smc === "netral"
+            ? "Belum ada break atau sweep searah pada swing terkonfirmasi."
+            : "Liquidity sweep pada swing terkonfirmasi dan kembali ke rentang.",
+        `Swing ${settings.swing} candle kiri dan kanan; pivot hanya digunakan sesudah konfirmasi.`,
+        `${analysis.zones.filter((zone) => zone.type === "FVG").length} FVG dan ${analysis.zones.filter((zone) => zone.type === "ORDER BLOCK").length} order block aktif.`,
       ],
     },
     {
@@ -149,15 +178,22 @@ export function scan(
         averageVolume === 0
           ? "abstain"
           : ratio > 1.15
-            ? last.close > last.open
+            ? volumeLast!.close > volumeLast!.open
               ? "long"
-              : "short"
+              : volumeLast!.close < volumeLast!.open
+                ? "short"
+                : "netral"
             : "netral",
       score: Math.min(95, Math.round(ratio * 50)),
       evidence: [
         averageVolume === 0
           ? "Volume tidak tersedia; abstain."
           : `Volume ${ratio.toFixed(2)}× rata-rata swing.`,
+        ...(context.volumeSource
+          ? [
+              `${context.volumeIsProxy ? "Proxy perpetual emas" : "Volume sumber"}: ${context.volumeSource}; candle ${last.time}.${context.volumeIsProxy ? " Harga proxy bukan harga acuan spot." : ""}`,
+            ]
+          : []),
       ],
     },
     {
@@ -346,14 +382,23 @@ export function decide(
       : "Mayoritas AI dan RR TP1 memenuhi aturan bos.",
   };
 }
+// expiresAt is the original entry deadline and stays available for audit.
+// Once entry is observed, that deadline no longer terminates the signal.
+export function signalExpired(signal: Signal, now: number): boolean {
+  return (
+    signal.status === "menunggu_entry" &&
+    (signal.entryClock
+      ? signal.entryClock.remainingMs <= 0
+      : signal.expiresAt !== null && now >= signal.expiresAt)
+  );
+}
 export function advanceSignal(
   signal: Signal,
   price: number,
   now: number,
 ): Signal {
   if (!["menunggu_entry", "aktif"].includes(signal.status)) return signal;
-  if (signal.expiresAt !== null && now >= signal.expiresAt)
-    return { ...signal, status: "kedaluwarsa" };
+  if (signalExpired(signal, now)) return { ...signal, status: "kedaluwarsa" };
   const [lo, hi] = signal.levels.entry;
   if (signal.status === "menunggu_entry")
     return price >= lo && price <= hi
@@ -369,18 +414,17 @@ export function advanceSignal(
       ? price <= signal.levels.sl
       : price >= signal.levels.sl
   )
-    return { ...signal, status: "stop_loss" };
-  const hitTargets = signal.levels.tp
-    .map((t, i) =>
-      (signal.direction === "long" ? price >= t : price <= t) ? i + 1 : 0,
-    )
-    .filter(Boolean);
-  const hits = [...new Set([...signal.hitTargets, ...hitTargets])];
+    return { ...signal, status: "stop_loss", exitAt: now, exitPrice: price };
+  const touchedTP1 =
+    signal.direction === "long"
+      ? price >= signal.levels.tp[0]
+      : price <= signal.levels.tp[0];
+  const hits = [...new Set([...signal.hitTargets, ...(touchedTP1 ? [1] : [])])];
   return {
     ...signal,
     hitTargets: hits,
-    status:
-      hits.length === signal.levels.tp.length ? "target_tercapai" : "aktif",
+    status: hits.includes(1) ? "target_tercapai" : "aktif",
+    ...(hits.includes(1) ? { exitAt: now, exitPrice: price } : {}),
   };
 }
 export function makeSignal(
@@ -410,7 +454,17 @@ export function makeSignal(
     rr: result.rr,
     status: "menunggu_entry",
     createdAt: now,
-    expiresAt: now + settings.ttl[tf]! * 1000,
+    expiresAt: symbol === "XAUUSD" ? null : now + settings.ttl[tf]! * 1000,
+    ...(symbol === "XAUUSD"
+      ? {
+          entryClock: {
+            remainingMs: settings.ttl[tf]! * 1000,
+            at: now,
+            state: "unknown" as const,
+            knownUntil: now,
+          },
+        }
+      : {}),
     source,
     votes,
     scanner,

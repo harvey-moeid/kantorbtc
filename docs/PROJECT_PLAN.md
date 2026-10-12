@@ -4,36 +4,44 @@ Status awal: MVP kantor trading sudah berjalan lokal. Dokumen ini adalah backlog
 
 ## Fondasi yang sudah tersedia
 
-Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay, chart lima timeframe, scanner awal, adapter delapan provider AI, voting/RR deterministik, pelacakan sinyal, login privat, API key terenkripsi, alert/outbox, serta backfill berbasis cursor sudah dibuat. Build, 126 tes otomatis, dan smoke browser desktop/ponsel lulus pada sesi implementasi. Enam tes baca BTC nyata serta probe stream Worker terisolasi berhasil. Integrasi emas/AI/Discord dengan akun nyata dan deployment produksi belum diverifikasi.
+Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay, chart lima timeframe, scanner awal, adapter delapan provider AI, voting/RR deterministik, pelacakan sinyal, login privat, API key terenkripsi, alert/outbox, serta backfill berbasis cursor sudah dibuat. Build, 308 tes otomatis, dan smoke browser desktop/ponsel lulus pada sesi implementasi. Enam tes baca BTC nyata serta probe stream Worker terisolasi berhasil. Integrasi emas/AI/Discord dengan akun nyata dan deployment produksi belum diverifikasi.
 
 ## P0 — Kunci aturan dan persiapan integrasi
 
-- [ ] Pemilik memilih TTL untuk 5m/15m/H1/H4/D1, apakah TTL terus berjalan setelah entry, serta perlakuan waktu pasar emas tutup. Usulan durasi di PRD tidak otomatis menjadi default.
-- [ ] Tetapkan margin numerik keunggulan scanner untuk voting 2–2 dan finalisasi aturan kuorum/abstain/gagal.
-- [ ] Tetapkan invalidasi struktur, pembatalan karena sinyal berlawanan, konflik antar timeframe, serta prioritas TP/SL pada kejadian bersamaan atau gap data.
-- [ ] Kunci definisi BOS/CHoCH/FVG/order block, sensitivitas swing, bobot volume dan derivatives, serta kelayakan proxy perpetual emas/COT.
-- [ ] Konfirmasi jumlah staf pendukung, kursi, dan target aset karakter akhir.
-- [ ] Dokumentasikan rekonsiliasi skema/status sinyal dan penyimpanan API key terenkripsi D1 dengan master key di Worker secret.
+- [x] Pemilik memilih TTL opsi A dan hitung mundur berhenti setelah entry (12 Oktober 2026); default dan migrasi audit diterapkan.
+- [x] Waktu pasar buka saja untuk XAUUSD, status provider/freshness, jeda saat closed/unknown, warning dan state budget persisten.
+- [x] Margin 40; mayoritas minimal tiga searah, tie-breaker hanya empat valid 2–2. Default/migrasi/audit dan boundary tests tersedia.
+- [x] Cancel waiting opponent pada timeframe sama, independensi timeframe dengan warning, SL tanpa invalidasi struktur otomatis, selesai pada TP1, dan hasil ambigu tanpa menebak urutan tick.
+- [x] Definisi pivot kiri/kanan, close BOS, CHoCH, tiga-candle FVG, dan last-opposing order block dikunci. Scanner/chart berbagi fungsi; tes prefix memastikan tidak memakai masa depan.
+- [x] Proxy volume emas verified, fallback dan alignment; tidak mengganti harga spot.
+- [ ] Finalisasi bobot/fitur volume/VWAP/profile/derivatives (COT sudah dikunci sebagai konteks AI saja).
+- [x] Jumlah 13 karakter (11 inti + IT/resepsionis) dikonfirmasi.
+- [ ] Finalisasi aset karakter GLB/rig/LOD dan animasi akhir.
+- [x] Skema JSON signal clock, exit, cancel dan status ambigu, ledger D1, serta credential D1/master Worker secret didokumentasikan pada PRD 20.12.
 - [ ] Siapkan akses Cloudflare/D1, provider emas, empat slot AI, dan channel Discord; pastikan model, kuota, cakupan histori, serta lisensi penggunaan data sesuai kebutuhan.
 
-**Selesai jika:** keputusan dicatat dan konfigurasi tervalidasi; TTL/margin yang belum dipilih tetap kosong. Kredensial masuk melalui secret/UI privat, tanpa masuk Git atau frontend. Implementasi sementara pada `IMPLEMENTATION.md` diganti hanya setelah aturan disepakati.
+**Selesai jika:** keputusan dicatat dan konfigurasi tervalidasi; TTL opsi A, margin 40 dan aturan 20.12 terkonfigurasi dan diaudit. Kredensial masuk melalui secret/UI privat, tanpa masuk Git atau frontend. Implementasi sementara pada `IMPLEMENTATION.md` diganti hanya setelah aturan disepakati.
 
 ## P1 — Data pasar dan histori yang andal
 
-- [ ] Tambahkan streaming pricing OANDA dengan reconnect, heartbeat, dan status pasar; pertahankan fallback Twelve Data serta jalur REST bila stream tidak tersedia.
+- [x] Tambahkan stream OANDA, reconnect/heartbeat, bounded NDJSON, status closed, REST/fallback, dan pemulihan primary dua menit. 15 tes transport/state lulus; akun nyata masih perlu acceptance.
 - [ ] Uji primary BTC, fallback OKX/Binance/Bybit, koneksi ulang, stale detection, dan pemulihan primary setelah stabil pada runtime deployment.
-- [ ] Lengkapi gap recovery setelah koneksi putus dan rekonsiliasi candle tertutup agar scanner tidak memakai candle parsial atau mencampur sumber tanpa jejak.
+- [x] Job recovery otomatis untuk gap histori dan lubang BTC, upsert/cursor/dedup, prioritas recovery, catatan perpindahan sumber, dan guard candle close/lookback BTC. 12 tes rekonsiliasi/backfill lulus.
+- [ ] Verifikasi kalender/kelengkapan candle emas dan recovery provider pada deployment nyata.
 - [ ] Jalankan backfill satu tahun untuk dua aset/lima timeframe; tangani pagination, batas provider, rate limit, resume, dan cakupan yang memang tidak tersedia.
-- [ ] Tambahkan fallback derivatives lintas exchange, konteks COT, dan proxy emas hanya bila data/kontrak benar-benar tersedia. Data kosong tetap abstain.
+- [x] Fallback funding/OI OKX → Binance → Bybit, baseline per sumber, freshness, dan pemeriksaan metadata kontrak emas; 8 tes lulus.
+- [x] Implementasikan konteks COT mingguan CFTC untuk AI emas saja, persistensi/freshness/snapshot meeting; skor scanner tetap.
+- [ ] Verifikasi endpoint CFTC dan derivatives dengan provider nyata.
 
 **Selesai jika:** sumber/waktu/status data dapat ditelusuri, gagal provider tidak menghasilkan data palsu, resume tidak menggandakan candle, dan cakupan histori aktual terlihat di UI. Target pemulihan failover <30 detik serta latensi tick ke layar sekitar 1–2 detik diukur, bukan diasumsikan dari demo.
 
 ## P2 — Scanner, AI, dan lifecycle sinyal
 
 - [ ] Implementasikan aturan scanner formal hasil P0, termasuk volume/VWAP/profile dan derivatives yang belum lengkap; buat fixture kasus struktur yang mewakili kondisi pasar.
-- [ ] Implementasikan invalidasi/pembatalan, konflik timeframe, dan prioritas status hasil P0; simpan alasan, waktu, harga teramati, dan versi konfigurasi pada audit.
+- [x] Aturan status hasil P0 dan ledger privat/pagination dibuat; publikasi/cancel batch atomik, clock persisten, guard terhadap update tick lama. Pembatalan struktur nonaktif sesuai keputusan pemilik.
 - [ ] Verifikasi empat slot AI dengan akun nyata: payload yang sama, panggilan paralel, schema output, timeout/retry, abstain, kuorum, dan RR pada entry terburuk/TP1.
-- [ ] Tambahkan provider/model cadangan per slot beserta batas biaya, kuota, dan alasan failover yang tercatat.
+- [x] Maksimal dua provider/model cadangan per slot, timeout/retry terikat, skema ID/provider/model bersama, dan audit percobaan pada voting. 9 tes panggilan, 5 tes API privat, serta smoke kontrol UI lulus.
+- [ ] Tambahkan batas biaya/kuota provider; jumlah percobaan terikat belum berarti ada anggaran biaya per akun.
 - [ ] Periksa katalog model/plan tiap adapter; hapus asumsi model yang tidak tersedia pada akun pengguna.
 - [ ] Uji alur penuh candle close → scanner → AI → RR → bos → entry/TP/SL/expiry/cancel, termasuk penolakan dan restart Worker.
 
@@ -41,7 +49,8 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 
 ## P3 — Chart, alert, bahasa, dan kantor
 
-- [ ] Lengkapi visual BOS/CHoCH, likuiditas, premium/discount, dan volume profile sesuai definisi P0; sinkronkan anotasi dengan analisis tersimpan.
+- [x] Visual BOS/CHoCH, likuiditas, midpoint premium/discount dan FVG/OB memakai definisi shared dan candle closed.
+- [ ] Tambahkan volume profile dan snapshot/anotasi analisis historis tersimpan.
 - [x] Tambahkan garis alert aktif pada chart, drag mouse/sentuhan dengan konfirmasi, edit numerik/keyboard, serta API privat untuk menyimpan level tanpa mengaktifkan ulang alert terpicu. Diperiksa dengan tes API/state dan smoke Chromium desktop/390 px.
 - [ ] Tambahkan indikator status data/gap yang konsisten di semua panel.
 - [ ] Tambahkan alert volatilitas ekstrem, penolakan sinyal, serta failover; ketiganya nonaktif secara default dan memiliki kontrol cooldown/dedup.
@@ -68,7 +77,7 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 - [ ] Buat D1 produksi, ganti ID placeholder, tetapkan secrets, dan tambahkan binding Workers AI bila digunakan.
 - [ ] Terapkan migrasi remote dan deploy staging; mulai dengan mode demo sebelum mengaktifkan live dengan konfigurasi tervalidasi.
 - [ ] Jalankan acceptance staging untuk login/logout, chart/histori, meeting/sinyal, public/private, alert, failover, dan restart.
-- [x] Tambahkan pipeline CI/CD: format, unit test, build artifact, tiga smoke browser, staging setelah CI main, dan production manual melalui GitHub Environment. Konfigurasi dan batas rollback dicatat di `CI_CD.md`; deployment nyata belum diverifikasi.
+- [x] Tambahkan pipeline CI/CD: format, unit test, build artifact, empat smoke browser, staging setelah CI main, dan production manual melalui GitHub Environment. Konfigurasi dan batas rollback dicatat di `CI_CD.md`; deployment nyata belum diverifikasi.
 - [ ] Tentukan subdomain `muidsoft.com`, konfigurasi DNS/TLS, serta uji prosedur backup/rollback produksi.
 - [ ] Aktifkan live setelah P0–P4 dan hasil acceptance memenuhi kriteria; catat hasil, batas provider, dan aturan operasional dalam dokumentasi rilis.
 
@@ -76,7 +85,7 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 
 ## Urutan kerja berikutnya
 
-1. Finalisasi P0 bersama pemilik; pekerjaan UI/i18n dan pengujian tanpa credential dapat tetap berjalan.
+1. Keputusan 20.11–20.12 sudah diterapkan. Berikutnya: bobot/fitur scanner lanjutan, verifikasi CFTC, kuota AI, visual dan i18n yang belum lengkap; pekerjaan tanpa credential dapat tetap berjalan.
 2. Validasi data dan histori P1, lalu alur keputusan/status P2 menggunakan aturan yang sudah dikunci.
 3. Selesaikan pengalaman pengguna P3; lakukan pengukuran/review P4 sebelum rilis.
 4. Deploy dan lakukan acceptance P5 setelah akses serta konfigurasi siap.
