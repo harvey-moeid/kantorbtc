@@ -13,7 +13,7 @@ import {
 import { useNavigate } from "react-router-dom";
 import type { Quote, Signal } from "../../../../packages/shared/src/domain";
 import { useStore } from "../store";
-import { price, dateTime } from "../i18n";
+import { price, dateTime, useT } from "../i18n";
 export const statusLabels: Record<Signal["status"], string> = {
   menunggu_entry: "Menunggu entry",
   aktif: "Aktif",
@@ -42,6 +42,7 @@ export function Modal({
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  const t = useT();
   useEffect(() => {
     const d = ref.current!;
     d.showModal();
@@ -51,14 +52,17 @@ export function Modal({
     <dialog
       ref={ref}
       className="modal"
-      onCancel={onClose}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
       <div className="modal-head">
         <h2>{title}</h2>
-        <button className="icon-button" aria-label="Tutup" onClick={onClose}>
+        <button className="icon-button" aria-label={t.close} onClick={onClose}>
           <X size={20} />
         </button>
       </div>

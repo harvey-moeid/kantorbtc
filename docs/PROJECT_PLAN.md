@@ -42,7 +42,8 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 ## P3 — Chart, alert, bahasa, dan kantor
 
 - [ ] Lengkapi visual BOS/CHoCH, likuiditas, premium/discount, dan volume profile sesuai definisi P0; sinkronkan anotasi dengan analisis tersimpan.
-- [ ] Tambahkan drag/edit garis alert dan indikator status data/gap yang konsisten di semua panel.
+- [x] Tambahkan garis alert aktif pada chart, drag mouse/sentuhan dengan konfirmasi, edit numerik/keyboard, serta API privat untuk menyimpan level tanpa mengaktifkan ulang alert terpicu. Diperiksa dengan tes API/state dan smoke Chromium desktop/390 px.
+- [ ] Tambahkan indikator status data/gap yang konsisten di semua panel.
 - [ ] Tambahkan alert volatilitas ekstrem, penolakan sinyal, serta failover; ketiganya nonaktif secara default dan memiliki kontrol cooldown/dedup.
 - [ ] Finalisasi penggunaan Cloudflare Queue sesuai PRD atau catat keputusan arsitektur pengganti; uji outbox/retry terhadap channel Discord nyata yang ditentukan pemilik.
 - [ ] Selesaikan terjemahan ID/EN seluruh panel, detail, validasi, label aksesibilitas, dan pesan Discord; pertahankan bahasa alasan AI sesuai pengaturan.
