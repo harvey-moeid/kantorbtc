@@ -85,6 +85,11 @@ async function outbound(request) {
 const options = (script) =>
   convertV4MiniflareOptions({
     ...workerOptions,
+    // CI smoke tests always use demo, even when the production config is live.
+    bindings: {
+      ...workerOptions.bindings,
+      ...(process.env.KANTOR_CI_DEMO === "1" ? { APP_MODE: "demo" } : {}),
+    },
     name: resolvedConfig.name,
     // esbuild already resolves source modules into one ESM bundle.
     modulesRules: undefined,

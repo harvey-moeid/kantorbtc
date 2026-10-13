@@ -43,7 +43,7 @@ node scripts/configure-local.mjs
 
 Masukkan password di terminal (tidak ditampilkan). Script membuat `.dev.vars` dengan password admin dan kunci AES-GCM acak, tanpa menimpa file yang sudah ada. Restart Worker setelah perubahan `.dev.vars`. Login membaca `ADMIN_PASSWORD` langsung dari environment; hash lama di D1 tidak digunakan. Demo tetap tersedia tanpa password dan terpisah dari API privat.
 
-`APP_MODE=demo` adalah default. API privat awalnya kosong: fixture demo hanya berada di frontend. Ubah `APP_MODE="live"` pada `.dev.vars` hanya setelah mengatur konektivitas dan provider; ini mengaktifkan pengambilan data, scanner, AI, backfill, dan outbox Discord. Cron lokal tidak otomatis berjalan. Untuk mengujinya secara sengaja, gunakan endpoint lokal Wrangler `/cdn-cgi/local/scheduled` setelah konfigurasi live siap.
+Konfigurasi deployment memakai `APP_MODE=live`; setup lokal melalui `scripts/configure-local.mjs` membuat `.dev.vars` dengan mode demo. Tes CI selalu memakai mode demo. API privat awalnya kosong: fixture demo hanya berada di frontend. Ubah `APP_MODE="live"` pada `.dev.vars` hanya setelah mengatur konektivitas dan provider; ini mengaktifkan pengambilan data, scanner, AI, backfill, dan outbox Discord. Cron lokal tidak otomatis berjalan. Untuk mengujinya secara sengaja, gunakan endpoint lokal Wrangler `/cdn-cgi/local/scheduled` setelah konfigurasi live siap.
 
 ## Fitur yang dapat dicoba
 
@@ -105,7 +105,7 @@ Worker live juga diperiksa dengan konfigurasi dan database sementara terpisah, t
 
 ## Deployment Cloudflare
 
-Pipeline GitHub Actions untuk CI, smoke browser, dan deployment staging/produksi dijelaskan di [panduan CI/CD](docs/CI_CD.md). CD membutuhkan konfigurasi GitHub Environments dan repository variable `CLOUDFLARE_DEPLOY_ENABLED=true`; production dipicu manual. Kedua target mulai dalam mode demo.
+Pipeline GitHub Actions untuk CI, smoke browser, dan deployment production dijelaskan di [panduan CI/CD](docs/CI_CD.md). CD memakai GitHub Environment `production` dan repository variable `CLOUDFLARE_DEPLOY_ENABLED=true`; push ke `main` atau pemicu manual pada `main` menjalankan deployment live setelah CI berhasil. Tes CI terisolasi dalam mode demo.
 
 Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 

@@ -36,7 +36,7 @@ with sync_playwright() as p:
  page.locator('.meeting-row').first.click()
  assert page.locator('dialog .presentation').count()==4
  page.locator('dialog').get_by_role('button',name='Tutup',exact=True).click()
- page.get_by_role('link',name='Pengaturan',exact=True).click()
+ page.locator('.main-nav').get_by_role('link',name='Pengaturan',exact=True).click()
  for tab in ['Scanner & risiko','Susunan AI','Koneksi API','Histori & backfill','Alert Discord','Umum & tampilan']:
   page.get_by_role('button',name=tab,exact=True).click()
  page.get_by_role('button',name='Simpan pengaturan',exact=True).click()

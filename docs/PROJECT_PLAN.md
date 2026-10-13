@@ -66,9 +66,9 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 ## P5 — Deployment dan penerimaan rilis
 
 - [ ] Buat D1 produksi, ganti ID placeholder, tetapkan secrets, dan tambahkan binding Workers AI bila digunakan.
-- [ ] Terapkan migrasi remote dan deploy staging; mulai dengan mode demo sebelum mengaktifkan live dengan konfigurasi tervalidasi.
-- [ ] Jalankan acceptance staging untuk login/logout, chart/histori, meeting/sinyal, public/private, alert, failover, dan restart.
-- [x] Tambahkan pipeline CI/CD: format, unit test, build artifact, tiga smoke browser, staging setelah CI main, dan production manual melalui GitHub Environment. Konfigurasi dan batas rollback dicatat di `CI_CD.md`; deployment nyata belum diverifikasi.
+- [ ] Terapkan migrasi remote dan deploy production live setelah konfigurasi tervalidasi.
+- [ ] Jalankan acceptance production untuk login/logout, chart/histori, meeting/sinyal, public/private, alert, failover, dan restart.
+- [x] Tambahkan pipeline CI/CD: format, unit test, build artifact, tiga smoke browser, production setelah CI main atau pemicu manual melalui GitHub Environment. Konfigurasi dan batas rollback dicatat di `CI_CD.md`; deployment nyata belum diverifikasi.
 - [ ] Tentukan subdomain `muidsoft.com`, konfigurasi DNS/TLS, serta uji prosedur backup/rollback produksi.
 - [ ] Aktifkan live setelah P0–P4 dan hasil acceptance memenuhi kriteria; catat hasil, batas provider, dan aturan operasional dalam dokumentasi rilis.
 
