@@ -15,8 +15,8 @@ export function deploymentConfig(
   base: Unstable_Config,
   options: DeploymentOptions,
 ) {
-  if (!["staging", "production"].includes(options.target))
-    throw new Error("DEPLOY_ENVIRONMENT must be staging or production.");
+  if (options.target !== "production")
+    throw new Error("DEPLOY_ENVIRONMENT must be production.");
   if (
     !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(
       options.databaseId,
@@ -26,9 +26,8 @@ export function deploymentConfig(
     throw new Error(
       "Set CLOUDFLARE_D1_DATABASE_ID to the target D1 database UUID.",
     );
-  const suffix = options.target === "staging" ? "-staging" : "";
-  const workerName = options.workerName || `${base.name}${suffix}`;
-  const databaseName = options.databaseName || `kantor-db${suffix}`;
+  const workerName = options.workerName || base.name || "";
+  const databaseName = options.databaseName || "kantor-db";
   for (const [field, value] of [
     ["CLOUDFLARE_WORKER_NAME", workerName],
     ["CLOUDFLARE_D1_DATABASE_NAME", databaseName],
@@ -68,9 +67,8 @@ export function deploymentConfig(
     })),
     durable_objects: base.durable_objects,
     migrations: base.migrations,
-    vars: { ...base.vars, APP_MODE: "demo" },
-    // Staging exercises demo behavior without scheduled integrations.
-    triggers: options.target === "staging" ? { crons: [] } : base.triggers,
+    vars: { ...base.vars, APP_MODE: "live" },
+    triggers: base.triggers,
     ...(base.ai ? { ai: base.ai } : {}),
   };
 }
@@ -112,7 +110,7 @@ async function main() {
   const config = deploymentConfig(
     unstable_readConfig({ config: resolve(root, "wrangler.jsonc") }),
     {
-      target: process.env.DEPLOY_ENVIRONMENT || "staging",
+      target: process.env.DEPLOY_ENVIRONMENT || "production",
       databaseId: process.env.CLOUDFLARE_D1_DATABASE_ID || "",
       databaseName: process.env.CLOUDFLARE_D1_DATABASE_NAME,
       workerName: process.env.CLOUDFLARE_WORKER_NAME,
@@ -123,7 +121,7 @@ async function main() {
   await mkdir(dirname(output), { recursive: true });
   await writeFile(output, `${JSON.stringify(config, null, 2)}\n`);
   console.log(
-    `Deployment config prepared for ${process.env.DEPLOY_ENVIRONMENT || "staging"} in .wrangler/ci-deploy/wrangler.json.`,
+    `Deployment config prepared for ${process.env.DEPLOY_ENVIRONMENT || "production"} in .wrangler/ci-deploy/wrangler.json.`,
   );
 }
 

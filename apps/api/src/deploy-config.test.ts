@@ -9,22 +9,22 @@ import {
 const root = resolve(import.meta.dirname, "../../..");
 const base = unstable_readConfig({ config: resolve(root, "wrangler.jsonc") });
 const databaseId = "11111111-2222-4333-8444-555555555555";
-const options = { target: "staging", databaseId, root };
+const options = { target: "production", databaseId, root };
 
 describe("Cloudflare deployment configuration", () => {
-  it("isolates staging and resolves paths relative to the checkout", () => {
+  it("resolves production resources and paths relative to the checkout", () => {
     const config = deploymentConfig(base, options);
-    expect(config.name).toBe("kantor-trading-staging");
+    expect(config.name).toBe("kantor-trading");
     expect(config.main).toBe(resolve(root, "apps/api/src/index.ts"));
     expect(config.assets.directory).toBe(resolve(root, "dist"));
     expect(config.d1_databases[0]).toMatchObject({
       binding: "DB",
-      database_name: "kantor-db-staging",
+      database_name: "kantor-db",
       database_id: databaseId,
       migrations_dir: resolve(root, "apps/api/migrations"),
     });
-    expect(config.vars.APP_MODE).toBe("demo");
-    expect(config.triggers.crons).toEqual([]);
+    expect(config.vars.APP_MODE).toBe("live");
+    expect(config.triggers).toEqual(base.triggers);
     expect(config.durable_objects).toEqual(base.durable_objects);
     expect(config.migrations).toEqual(base.migrations);
     expect(base.d1_databases[0].database_id).toBe(
@@ -42,11 +42,15 @@ describe("Cloudflare deployment configuration", () => {
     expect(config.name).toBe("kantor-prod");
     expect(config.d1_databases[0].database_name).toBe("kantor-prod-db");
     expect(config.triggers).toEqual(base.triggers);
-    expect(config.vars.APP_MODE).toBe("demo");
+    expect(config.vars.APP_MODE).toBe("live");
   });
 
-  it("uses distinct default production names", () => {
-    const config = deploymentConfig(base, { ...options, target: "production" });
+  it("keeps production live when the base config uses demo", () => {
+    const config = deploymentConfig(
+      { ...base, vars: { ...base.vars, APP_MODE: "demo" } },
+      options,
+    );
+    expect(config.vars.APP_MODE).toBe("live");
     expect(config.name).toBe("kantor-trading");
     expect(config.d1_databases[0].database_name).toBe("kantor-db");
   });
@@ -59,6 +63,12 @@ describe("Cloudflare deployment configuration", () => {
       ).toThrow("CLOUDFLARE_D1_DATABASE_ID");
     },
   );
+
+  it("rejects the removed staging target", () => {
+    expect(() =>
+      deploymentConfig(base, { ...options, target: "staging" }),
+    ).toThrow("DEPLOY_ENVIRONMENT must be production");
+  });
 
   it("rejects unexpected targets and invalid resource names", () => {
     expect(() =>

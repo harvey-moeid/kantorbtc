@@ -13,7 +13,8 @@ with sync_playwright() as p:
  page.goto(base,wait_until='networkidle')
  assert '$67,482' not in page.inner_text('body')
  page.get_by_role('button',name='Jelajahi demo',exact=True).click()
- page.get_by_label('Kualitas 3D',exact=True).select_option('medium')
+ # Headless CI uses software rendering; test replay behavior without shadow-map cost.
+ page.get_by_label('Kualitas 3D',exact=True).select_option('low')
  page.get_by_role('button',name='Simulasi rapat',exact=True).click()
  page.get_by_role('button',name='Jeda replay',exact=True).click()
  page.get_by_role('button',name='Ikuti pembicara',exact=True).click()
@@ -65,6 +66,8 @@ with sync_playwright() as p:
  assert reduced.get_by_role('button',name='Lantai 2',exact=True).get_attribute('class')=='active'
  reduced.evaluate('window.scrollTo(0,0)')
  reduced.screenshot(path='test-results/meeting-mobile.png',full_page=True)
+ page.close()
+ reduced.close()
  public=browser.new_page(viewport={'width':1200,'height':900})
  public.on('pageerror',lambda e:errors.append(str(e)))
  routes=[]
@@ -73,6 +76,8 @@ with sync_playwright() as p:
   ws.send(json.dumps({'type':'meeting','meeting':'scanner','meetingId':'public-fixture','at':int(time.time()*1000),'aiTriggered':False,'reason':'PRIVATE_MARKER_LONG_67400','price':67400}))
  public.route_web_socket('**/api/public/stream',handle)
  public.goto(base,wait_until='networkidle')
+ # Transport retries do not depend on 3D; avoid GPU load delaying reconnect timers.
+ public.get_by_role('button',name='Ganti mode 2D/3D',exact=True).click()
  public.locator('.meeting-playback').wait_for()
  assert 'PRIVATE_MARKER' not in public.inner_text('body')
  assert '67400' not in public.inner_text('body')

@@ -6,6 +6,7 @@ mkdir -p test-results
 # Isolate local D1 state so a test run cannot modify a developer's database.
 test_state_root=$(mktemp -d)
 export KANTOR_STATE_DIR="$test_state_root/v3"
+export KANTOR_CI_DEMO=1
 api_pid=""
 web_pid=""
 cleanup() {
@@ -41,7 +42,7 @@ for attempt in range(60):
             health = json.load(response)
         if health.get('status') == 'ok' and health.get('mode') == 'demo':
             break
-        raise SystemExit('CI smoke tests require APP_MODE=demo.')
+        raise SystemExit(f"CI smoke tests require APP_MODE=demo; received status={health.get('status')!r}, mode={health.get('mode')!r}.")
     except (OSError, ValueError):
         time.sleep(0.5)
 else:
