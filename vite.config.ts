@@ -8,27 +8,11 @@ export default defineConfig({
     outDir: "../../dist",
     emptyOutDir: true,
     rollupOptions: {
-      output: {
-        onlyExplicitManualChunks: true,
-        manualChunks(id) {
-          if (
-            /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(
-              id,
-            )
-          )
-            return "framework";
-          if (
-            /\/node_modules\/(zustand|zod|use-sync-external-store)\//.test(id)
-          )
-            return "state";
-          if (
-            /\/node_modules\/(three|@react-three\/fiber|@react-three\/drei|react-reconciler|three-stdlib|maath|suspend-react)\//.test(
-              id,
-            )
-          )
-            return "three";
-          if (id.includes("/node_modules/lightweight-charts/")) return "chart";
-        },
+      // Keep dependency initialization ordered by Rollup, including 3D decoders.
+      // A circular chunk can build successfully but crash when a lazy route loads.
+      onwarn(warning, warn) {
+        if (warning.code === "CIRCULAR_CHUNK") throw new Error(warning.message);
+        warn(warning);
       },
     },
   },

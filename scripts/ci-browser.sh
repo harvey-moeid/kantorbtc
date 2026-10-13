@@ -32,7 +32,13 @@ PY
 pnpm exec wrangler d1 migrations apply kantor-db --local --persist-to "$test_state_root"
 setsid node scripts/dev-proxy.mjs >test-results/api.log 2>&1 &
 api_pid=$!
-setsid node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5173 --strictPort >test-results/web.log 2>&1 &
+# Exercise the exact build downloaded by CI and later deployed to Cloudflare.
+# A dev server would hide production-only chunk initialization failures.
+if [[ ! -f dist/index.html ]]; then
+  echo 'Missing production build; run pnpm build before CI smoke tests.' >&2
+  exit 1
+fi
+setsid node node_modules/vite/bin/vite.js preview --host 127.0.0.1 --port 5173 --strictPort >test-results/web.log 2>&1 &
 web_pid=$!
 python - <<'PY'
 import json, time, urllib.request
