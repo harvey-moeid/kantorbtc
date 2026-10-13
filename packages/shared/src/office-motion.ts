@@ -79,7 +79,7 @@ export function idleRoutine(
   if (offset > 3) return { activity: "work", position: home, moving: false };
   const activity = offset === 3 ? "musolla" : "coffee",
     destination: Point =
-      offset === 3 ? [5, 0, 1.4] : [2.4 + offset * 0.5, 0, -1.65];
+      offset === 3 ? [4.4, 0, 1.4] : [2.4 + offset * 0.5, 0, -1.65];
   const p =
     phase < 15
       ? phase / 15
@@ -90,7 +90,12 @@ export function idleRoutine(
           : 0;
   return {
     activity: p === 0 ? "work" : activity,
-    position: pathAt([home, [3.3, 0, 2.1], [3.3, 0, -0.8], destination], p),
+    position: pathAt(
+      activity === "musolla"
+        ? [home, [3.3, 0, 2.7], [4.4, 0, 2.7], [4.4, 0, 2.05], destination]
+        : [home, [3.3, 0, 2.1], [3.3, 0, -0.8], destination],
+      p,
+    ),
     moving: p > 0 && p < 1,
   };
 }

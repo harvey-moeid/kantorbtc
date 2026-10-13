@@ -110,6 +110,8 @@ input::placeholder {
   display: flex;
   flex-direction: column;
   padding: 30px 18px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: 20;
 }
 .brand {
@@ -231,6 +233,30 @@ input::placeholder {
   padding: 3px;
   border-radius: 4px;
   font-size: 10px;
+}
+.sidebar > * {
+  flex-shrink: 0;
+}
+.header-settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid #526443;
+  border-radius: 7px;
+  color: var(--lime);
+  font-size: 12px;
+}
+.header-settings:hover,
+.header-settings.active {
+  background: #263321;
+}
+.header-settings:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 3px;
 }
 .sidebar-bottom {
   margin-top: auto;
@@ -766,7 +792,12 @@ h1 {
   flex: 1;
   position: relative;
   min-height: 510px;
-  background: radial-gradient(ellipse at 48% 65%, #4a524133, #1b231a 65%);
+  background: radial-gradient(
+    ellipse at 50% 70%,
+    #3e555c 0%,
+    #192830 48%,
+    #101921 85%
+  );
   overflow: hidden;
   background-size: auto;
 }
@@ -774,11 +805,9 @@ h1 {
   content: "";
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(#52634b0c 1px, transparent 1px),
-    linear-gradient(90deg, #52634b0c 1px, transparent 1px);
-  background-size: 34px 34px;
+  box-shadow: inset 0 0 90px #07121b55;
   pointer-events: none;
+  z-index: 1;
 }
 .scene-label {
   position: absolute;
@@ -842,6 +871,11 @@ h1 {
   border: 0;
   background: transparent;
   width: 65px;
+}
+.scene-tools .camera-view-select {
+  width: 108px;
+  border-right: 1px solid #3a4832;
+  margin-right: 3px;
 }
 .scene-hint {
   position: absolute;
@@ -2238,6 +2272,12 @@ h1 {
   }
 }
 @media (max-width: 760px) {
+  .header-settings {
+    padding: 0;
+  }
+  .header-settings span {
+    display: none;
+  }
   .sidebar {
     transform: translateX(-100%);
     width: 238px;
@@ -3055,5 +3095,17 @@ h1 {
   }
   .playback-controls input {
     min-height: 30px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar-workspace {
+    display: none;
+  }
+  .topbar-actions {
+    gap: 6px !important;
+  }
+  .topbar .button.small {
+    padding-inline: 9px;
   }
 }

@@ -263,6 +263,7 @@ export default function App() {
     ["/chart/btcusdt", TrendingUp, t.chart],
     ["/signals", Zap, t.signals],
     ["/meetings", MessageSquare, t.meetings],
+    ["/settings", Settings2, t.settings],
   ] as const;
   return (
     <div className="app-shell">
@@ -339,23 +340,6 @@ export default function App() {
                   : "Public workspace"}
             </span>
           </div>
-          <NavLink
-            to="/settings"
-            className={
-              location.pathname === "/settings"
-                ? "settings-link active"
-                : "settings-link"
-            }
-            onClick={(e) => {
-              if (state.publicView) {
-                e.preventDefault();
-                setLogin(true);
-              }
-            }}
-          >
-            <Settings2 size={18} />
-            {t.settings}
-          </NavLink>
           <button
             className="profile"
             onClick={() =>
@@ -412,6 +396,21 @@ export default function App() {
             </span>
           </div>
           <div className="topbar-actions">
+            <NavLink
+              to="/settings"
+              className="header-settings"
+              aria-label={t.settings}
+              title={t.settings}
+              onClick={(e) => {
+                if (state.publicView) {
+                  e.preventDefault();
+                  setLogin(true);
+                }
+              }}
+            >
+              <Settings2 size={18} />
+              <span>{t.settings}</span>
+            </NavLink>
             <Badge
               tone={state.demo ? "amber" : state.publicView ? "" : "green"}
             >
