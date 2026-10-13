@@ -1,20 +1,28 @@
 from playwright.sync_api import sync_playwright, expect
 from pathlib import Path
-import json,os,time
+import json,os,time,subprocess
 base=os.environ.get('KANTOR_BASE_URL','http://127.0.0.1:5173')
 Path('test-results').mkdir(exist_ok=True)
+# Use real defaults with manual low quality before the first 3D frame. Software
+# rendering can legitimately trigger automatic 2D fallback before a UI click.
+preferences=subprocess.check_output(['node','--input-type=module','-e',
+ "import { defaultSettings } from './packages/shared/src/domain.ts'; console.log(JSON.stringify({state:{settings:{...defaultSettings,quality:'low'},mode2d:false},version:0}));"],
+ cwd=Path(__file__).resolve().parents[1],text=True).strip()
 def seek(page,value):
  page.get_by_role('slider',name='Posisi replay',exact=True).evaluate("""(el,value)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,String(value));el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));}""",value)
 with sync_playwright() as p:
  browser=p.chromium.launch(headless=True,executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),args=['--no-sandbox','--enable-unsafe-swiftshader'])
  errors=[]
  page=browser.new_page(viewport={'width':1440,'height':1000})
+ page.add_init_script(f"localStorage.setItem('kantor-preferences-v1',JSON.stringify({preferences}));")
  page.on('pageerror',lambda e:errors.append(str(e)))
  page.goto(base,wait_until='networkidle')
  assert '$67,482' not in page.inner_text('body')
  page.get_by_role('button',name='Jelajahi demo',exact=True).click()
  # Headless CI uses software rendering; test replay behavior without shadow-map cost.
  page.get_by_label('Kualitas 3D',exact=True).select_option('low')
+ expect(page.get_by_label('Statistik render',exact=True)).to_contain_text('LOW',timeout=10000)
+ expect(page.locator('.scene-area canvas')).to_be_visible()
  page.get_by_role('button',name='Simulasi rapat',exact=True).click()
  page.get_by_role('button',name='Jeda replay',exact=True).click()
  page.get_by_role('button',name='Ikuti pembicara',exact=True).click()
