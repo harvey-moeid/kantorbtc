@@ -1,4 +1,4 @@
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, expect
 from pathlib import Path
 import json,os,time
 base=os.environ.get('KANTOR_BASE_URL','http://127.0.0.1:5173')
@@ -46,15 +46,20 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Hentikan replay',exact=True).click()
  assert page.locator('.meeting-playback').count()==0
  page.get_by_role('button',name='Simulasi rapat',exact=True).click()
+ replay_position=page.get_by_role('slider',name='Posisi replay',exact=True)
+ render_stats=page.get_by_label('Statistik render',exact=True)
+ page.wait_for_function('Number(document.querySelector(".meeting-playback input[type=range]").value)>0',timeout=10000)
  page.evaluate("""()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});document.dispatchEvent(new Event('visibilitychange'));}""")
- page.wait_for_timeout(250)
- before=page.get_by_role('slider',name='Posisi replay',exact=True).input_value()
+ # Visibility effects commit asynchronously, especially with software-rendered 3D.
+ # Wait for the pause before sampling the replay rather than assuming a fixed delay.
+ expect(render_stats).to_contain_text('PAUSED',timeout=10000)
+ before=replay_position.input_value()
  page.wait_for_timeout(700)
- assert page.get_by_role('slider',name='Posisi replay',exact=True).input_value()==before
- assert 'PAUSED' in page.get_by_label('Statistik render',exact=True).inner_text()
- page.evaluate("""()=>{Object.defineProperty(document,'hidden',{configurable:true,get:()=>false});document.dispatchEvent(new Event('visibilitychange'));}""")
- page.wait_for_timeout(300)
- assert 'PAUSED' not in page.get_by_label('Statistik render',exact=True).inner_text()
+ expect(replay_position).to_have_value(before)
+ page.evaluate("""()=>{delete document.hidden;document.dispatchEvent(new Event('visibilitychange'));}""")
+ expect(render_stats).not_to_contain_text('PAUSED',timeout=10000)
+ # A resumed badge alone is insufficient: the replay must also advance again.
+ page.wait_for_function('(before)=>Number(document.querySelector(".meeting-playback input[type=range]").value)>Number(before)',arg=before,timeout=10000)
  reduced=browser.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,reduced_motion='reduce')
  reduced.on('pageerror',lambda e:errors.append(str(e)))
  reduced.goto(base,wait_until='networkidle');reduced.get_by_role('button',name='Jelajahi demo',exact=True).click()
