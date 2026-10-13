@@ -80,18 +80,7 @@ app.post("/api/auth/login", async (c) => {
     .object({ password: z.string().min(1).max(256) })
     .safeParse(await c.req.json());
   if (!parsed.success) return c.json({ error: "Password diperlukan." }, 400);
-  let user = await c.env.DB.prepare(
-    "SELECT id,password_hash FROM users WHERE id='owner'",
-  ).first<{ id: string; password_hash: string }>();
-  if (!user && c.env.ADMIN_PASSWORD_HASH) {
-    await c.env.DB.prepare(
-      "INSERT OR IGNORE INTO users(id,password_hash,created_at) VALUES('owner',?,?)",
-    )
-      .bind(c.env.ADMIN_PASSWORD_HASH, Date.now())
-      .run();
-    user = { id: "owner", password_hash: c.env.ADMIN_PASSWORD_HASH };
-  }
-  if (!user)
+  if (!c.env.ADMIN_PASSWORD)
     return c.json(
       {
         error:
@@ -113,12 +102,17 @@ app.post("/api/auth/login", async (c) => {
       429,
     );
   }
-  if (!(await verifyPassword(parsed.data.password, user.password_hash)))
+  if (!(await verifyPassword(parsed.data.password, c.env.ADMIN_PASSWORD)))
     return c.json({ error: "Password tidak valid." }, 401);
   const token = Array.from(crypto.getRandomValues(new Uint8Array(32)), (n) =>
       n.toString(16).padStart(2, "0"),
     ).join(""),
     expires = now + 86400000;
+  await c.env.DB.prepare(
+    "INSERT OR IGNORE INTO users(id,password_hash,created_at) VALUES('owner','env-managed',?)",
+  )
+    .bind(now)
+    .run();
   await c.env.DB.batch([
     c.env.DB.prepare(
       "INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)",

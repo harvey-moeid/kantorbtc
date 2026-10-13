@@ -1,23 +1,23 @@
 import { describe, expect, it } from "vitest";
-import {
-  decrypt,
-  encrypt,
-  hashPassword,
-  hashToken,
-  verifyPassword,
-} from "./security";
+import { decrypt, encrypt, hashToken, verifyPassword } from "./security";
 import { safeWebhook } from "./notifications";
 describe("credentials and authentication", () => {
-  it("hashes a password and rejects wrong input", async () => {
-    const hash = await hashPassword("local-test-password");
-    expect(hash).not.toContain("local-test-password");
-    expect(await verifyPassword("local-test-password", hash)).toBe(true);
-    expect(await verifyPassword("wrong", hash)).toBe(false);
+  it("checks the configured plain password exactly", async () => {
+    expect(
+      await verifyPassword("local-test-password", "local-test-password"),
+    ).toBe(true);
+    expect(await verifyPassword("wrong", "local-test-password")).toBe(false);
+    expect(
+      await verifyPassword(" local-test-password", "local-test-password"),
+    ).toBe(false);
+    expect(
+      await verifyPassword("local-test-password", "local-test-password "),
+    ).toBe(false);
   });
-  it("rejects malformed password encodings", async () =>
-    expect(await verifyPassword("anything", "not-a-hash")).toBe(false));
-  it("uses unique salts", async () =>
-    expect(await hashPassword("same")).not.toEqual(await hashPassword("same")));
+  it("rejects missing or empty password configuration", async () => {
+    expect(await verifyPassword("anything")).toBe(false);
+    expect(await verifyPassword("", "")).toBe(false);
+  });
   it("encrypts with unique nonce and recovers plaintext", async () => {
     const key = "ab".repeat(32),
       a = await encrypt("test-fixture-value", key),

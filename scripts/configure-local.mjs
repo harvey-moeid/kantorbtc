@@ -1,5 +1,5 @@
 import { writeFile, access } from "node:fs/promises";
-import { randomBytes, pbkdf2Sync } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 import { stdin, stdout } from "node:process";
@@ -35,11 +35,9 @@ if (password.length < 12) {
   console.error("Password minimal 12 karakter.");
   process.exit(1);
 }
-const salt = randomBytes(16),
-  hash = `pbkdf2$100000$${salt.toString("base64")}$${pbkdf2Sync(password, salt, 100000, 32, "sha256").toString("base64")}`;
 await writeFile(
   destination,
-  `APP_MODE="demo"\nADMIN_PASSWORD_HASH='${hash}'\nENCRYPTION_KEY="${randomBytes(32).toString("hex")}"\n`,
+  `APP_MODE="demo"\nADMIN_PASSWORD=${JSON.stringify(password)}\nENCRYPTION_KEY="${randomBytes(32).toString("hex")}"\n`,
   { mode: 0o600, flag: "wx" },
 );
 console.log("Login lokal siap. .dev.vars diabaikan Git; APP_MODE tetap demo.");
