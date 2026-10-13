@@ -74,6 +74,19 @@ describe("office paths and capacity", () => {
       ).toBeLessThanOrEqual(1);
     }
   });
+  it("enters the prayer room through its front doorway", () => {
+    for (let t = 0; t < 180; t += 0.1) {
+      for (let i = 0; i < homes.length; i++) {
+        const routine = idleRoutine(i, t);
+        if (routine.activity !== "musolla") continue;
+        const [x, , z] = routine.position;
+        if (x > 3.55 && z < 2.3) {
+          expect(x).toBeCloseTo(4.4);
+          expect(z).toBeGreaterThanOrEqual(1.4);
+        }
+      }
+    }
+  });
   it("keeps upper-floor staff on their own floor while idle", () => {
     for (let t = 0; t < 1000; t += 30)
       for (let i = 8; i <= 10; i++)

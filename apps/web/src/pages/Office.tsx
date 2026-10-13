@@ -210,6 +210,7 @@ export default function Office() {
     publicView = useStore((s) => s.publicView),
     meetings = useStore((s) => s.meetings),
     [reset, resetCamera] = useState(0),
+    [cameraView, setCameraView] = useState<"overview" | "interior">("overview"),
     [follow, setFollow] = useState(false),
     [stats, setStats] = useState<RenderStats | null>(null),
     playback = useOfficeMeeting(),
@@ -316,6 +317,7 @@ export default function Office() {
                     if (!publicView) navigate(`/chart/${s}`);
                   }}
                   reset={reset}
+                  view={cameraView}
                   frame={playback.frame}
                   follow={follow}
                   onManual={() => setFollow(false)}
@@ -325,6 +327,23 @@ export default function Office() {
               </Suspense>
             )}
             <div className="scene-tools">
+              {!mode2d && (
+                <select
+                  className="camera-view-select"
+                  aria-label="Sudut kamera"
+                  value={cameraView}
+                  onChange={(e) => {
+                    const view = e.target.value as "overview" | "interior";
+                    setFollow(false);
+                    setCameraView(view);
+                    if (view === "interior" && floor === "all")
+                      set({ floor: "1" });
+                  }}
+                >
+                  <option value="overview">Seluruh kantor</option>
+                  <option value="interior">Detail interior</option>
+                </select>
+              )}
               <button
                 className="icon-button"
                 aria-label="Reset kamera"
