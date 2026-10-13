@@ -7,44 +7,20 @@ export async function hashToken(token: string): Promise<string> {
     n.toString(16).padStart(2, "0"),
   ).join("");
 }
-export async function hashPassword(
-  password: string,
-  salt = crypto.getRandomValues(new Uint8Array(16)),
-  iterations = 100000,
-): Promise<string> {
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(password),
-    "PBKDF2",
-    false,
-    ["deriveBits"],
-  );
-  const result = await crypto.subtle.deriveBits(
-    { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-    key,
-    256,
-  );
-  return `pbkdf2$${iterations}$${base64(salt)}$${base64(new Uint8Array(result))}`;
-}
 export async function verifyPassword(
   password: string,
-  hash: string,
+  expected?: string,
 ): Promise<boolean> {
-  try {
-    const [kind, n, salt, value] = hash.split("$");
-    const iterations = Number(n);
-    if (kind !== "pbkdf2" || iterations !== 100000) return false;
-    const actual = (
-      await hashPassword(password, bytes(salt), iterations)
-    ).split("$")[3];
-    if (actual.length !== value.length) return false;
-    let diff = 0;
-    for (let i = 0; i < actual.length; i++)
-      diff |= actual.charCodeAt(i) ^ value.charCodeAt(i);
-    return diff === 0;
-  } catch {
-    return false;
-  }
+  if (!expected) return false;
+  const [actualDigest, expectedDigest] = await Promise.all([
+    crypto.subtle.digest("SHA-256", enc.encode(password)),
+    crypto.subtle.digest("SHA-256", enc.encode(expected)),
+  ]);
+  const actual = new Uint8Array(actualDigest);
+  const configured = new Uint8Array(expectedDigest);
+  let diff = 0;
+  for (let i = 0; i < actual.length; i++) diff |= actual[i] ^ configured[i];
+  return diff === 0;
 }
 async function encryptionKey(secret?: string): Promise<CryptoKey> {
   if (!secret || !/^[0-9a-f]{64}$/i.test(secret))

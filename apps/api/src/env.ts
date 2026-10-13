@@ -4,7 +4,7 @@ export interface Env {
   ASSETS: Fetcher;
   AI?: Ai;
   APP_MODE: "demo" | "live";
-  ADMIN_PASSWORD_HASH?: string;
+  ADMIN_PASSWORD?: string;
   ENCRYPTION_KEY?: string;
   OANDA_ACCOUNT_ID?: string;
   OANDA_ENV?: "practice" | "live";

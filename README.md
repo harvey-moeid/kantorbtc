@@ -41,7 +41,7 @@ Di lingkungan cloud yang mengharuskan proxy keluar, gunakan **`pnpm dev:api:prox
 node scripts/configure-local.mjs
 ```
 
-Masukkan password di terminal (tidak ditampilkan). Script membuat `.dev.vars` dengan hash PBKDF2 dan kunci AES-GCM acak, tanpa menimpa file yang sudah ada. Restart Worker setelah perubahan `.dev.vars`. Login pertama menyimpan hash owner di D1. Demo tetap tersedia tanpa password dan terpisah dari API privat.
+Masukkan password di terminal (tidak ditampilkan). Script membuat `.dev.vars` dengan password admin dan kunci AES-GCM acak, tanpa menimpa file yang sudah ada. Restart Worker setelah perubahan `.dev.vars`. Login membaca `ADMIN_PASSWORD` langsung dari environment; hash lama di D1 tidak digunakan. Demo tetap tersedia tanpa password dan terpisah dari API privat.
 
 `APP_MODE=demo` adalah default. API privat awalnya kosong: fixture demo hanya berada di frontend. Ubah `APP_MODE="live"` pada `.dev.vars` hanya setelah mengatur konektivitas dan provider; ini mengaktifkan pengambilan data, scanner, AI, backfill, dan outbox Discord. Cron lokal tidak otomatis berjalan. Untuk mengujinya secara sengaja, gunakan endpoint lokal Wrangler `/cdn-cgi/local/scheduled` setelah konfigurasi live siap.
 
@@ -110,7 +110,7 @@ Pipeline GitHub Actions untuk CI, smoke browser, dan deployment staging/produksi
 Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 
 1. Autentikasi Wrangler ke akun Cloudflare pemilik. Buat D1 `kantor-db`, lalu ganti `database_id` placeholder di `wrangler.jsonc` dengan ID sebenarnya.
-2. Tetapkan secrets `ADMIN_PASSWORD_HASH` dan `ENCRYPTION_KEY` melalui penyimpanan secret Cloudflare. Format hash dibuat oleh script lokal; kunci AES berupa 64 digit hex. Jangan commit `.dev.vars` atau memasukkan kredensial ke frontend. Jangan mengganti kunci enkripsi tanpa migrasi ciphertext.
+2. Tetapkan secrets `ADMIN_PASSWORD` dan `ENCRYPTION_KEY` melalui penyimpanan secret Cloudflare. Isi `ADMIN_PASSWORD` dengan password biasa, bukan hash; kunci AES berupa 64 digit hex. Jangan commit `.dev.vars` atau memasukkan kredensial ke frontend. Jangan mengganti kunci enkripsi tanpa migrasi ciphertext.
 3. Opsional: tambahkan `"ai": { "binding": "AI" }` di konfigurasi untuk Workers AI. Tetapkan `OANDA_ACCOUNT_ID` dan `OANDA_ENV` jika memakai OANDA pricing. Atur model/plan dan API key melalui halaman API setelah login.
 4. Terapkan migrasi D1 remote secara sengaja, build, lalu deploy Worker. Untuk pengujian pertama pertahankan `APP_MODE=demo`; aktifkan live sesudah memvalidasi konfigurasi, key, aturan scanner, TTL, dan lisensi.
 5. Uji koneksi baca provider di UI, histori/pagination, stream/failover, quorum/timeout, outbox, dan performa di perangkat target. Cloudflare Workers websocket port dan endpoint provider perlu diuji pada akun deployment.
