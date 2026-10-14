@@ -337,6 +337,14 @@ app.put("/api/settings/api/:provider", async (c) => {
       { error: "ENCRYPTION_KEY belum dikonfigurasi pada Worker." },
       503,
     );
+  if (!/^[0-9a-f]{64}$/i.test(c.env.ENCRYPTION_KEY))
+    return c.json(
+      {
+        error:
+          "Format ENCRYPTION_KEY pada Worker tidak valid. Gunakan 64 karakter hexadecimal (0–9, a–f). Jangan mengganti kunci lama jika sudah ada kredensial tersimpan tanpa migrasi.",
+      },
+      503,
+    );
   const value = parsed.data.value,
     encrypted = await encrypt(value, c.env.ENCRYPTION_KEY),
     now = Date.now();

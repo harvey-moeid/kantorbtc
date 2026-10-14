@@ -17,6 +17,7 @@
       "migrations_dir": "apps/api/migrations",
     },
   ],
+  "ai": { "binding": "AI" },
   "durable_objects": {
     "bindings": [{ "name": "MARKET_HUB", "class_name": "MarketHub" }],
   },

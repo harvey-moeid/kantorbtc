@@ -91,7 +91,7 @@ python tests/alert_smoke.py
 
 Jalankan kedua server sebelum smoke browser. Screenshot disimpan di `test-results/`, yang diabaikan Git. Tes browser memeriksa privasi publik, perpindahan lantai, karakter, chart/indikator, alert, filter, detail sinyal/meeting, pengaturan, bahasa, dan responsivitas 390 px. Smoke alert memeriksa edit numerik, validasi harga, drag desktop/sentuhan ponsel, batal/konfirmasi, keyboard, isolasi aset, dan bahwa demo tidak mengirim perubahan ke API privat.
 
-173 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
+176 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
 
 Alert aktif yang belum terpicu ditampilkan sebagai garis pada chart. Geser pegangan garis untuk memilih level baru lalu konfirmasikan di formulir, atau gunakan tombol **Ubah alert** untuk mengisi harga langsung. Enter/Space pada pegangan membuka editor yang sama. Menutup formulir mempertahankan level tersimpan. Alert terpicu/nonaktif tidak bisa diedit atau diaktifkan ulang melalui perubahan harga; buat alert baru bila diperlukan. Mode demo hanya mengubah state sesi lokal, sedangkan workspace privat menyimpan perubahan di D1.
 
@@ -111,7 +111,7 @@ Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 
 1. Autentikasi Wrangler ke akun Cloudflare pemilik. Workflow production sudah menetapkan target D1 `kantor-db` dan script deployment mengganti placeholder lokal dengan `CLOUDFLARE_D1_DATABASE_ID`. Verifikasi binding dan migrasi pada deployment aktual; konfigurasi repository saja belum membuktikan operasi database remote.
 2. Tetapkan secrets `ADMIN_PASSWORD` dan `ENCRYPTION_KEY` melalui penyimpanan secret Cloudflare. Isi `ADMIN_PASSWORD` dengan password biasa, bukan hash; kunci AES berupa 64 digit hex. Jangan commit `.dev.vars` atau memasukkan kredensial ke frontend. Jangan mengganti kunci enkripsi tanpa migrasi ciphertext.
-3. Opsional: tambahkan `"ai": { "binding": "AI" }` di konfigurasi untuk Workers AI. Tetapkan `OANDA_ACCOUNT_ID` dan `OANDA_ENV` jika memakai OANDA pricing. Atur model/plan dan API key melalui halaman API setelah login.
+3. Binding `"ai": { "binding": "AI" }` sudah disertakan di konfigurasi; deploy diperlukan untuk memasangnya pada Worker. Tetapkan `OANDA_ACCOUNT_ID` dan `OANDA_ENV` jika memakai OANDA pricing. Atur model/plan dan API key melalui halaman API setelah login.
 4. Terapkan migrasi D1 remote secara sengaja, build, lalu deploy Worker. Untuk pengujian pertama pertahankan `APP_MODE=demo`; aktifkan live sesudah memvalidasi konfigurasi, key, aturan scanner, TTL, dan lisensi.
 5. Uji koneksi baca provider di UI, histori/pagination, stream/failover, quorum/timeout, outbox, dan performa di perangkat target. Cloudflare Workers websocket port dan endpoint provider perlu diuji pada akun deployment.
 

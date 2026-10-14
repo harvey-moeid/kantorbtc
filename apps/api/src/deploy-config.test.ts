@@ -23,6 +23,7 @@ describe("Cloudflare deployment configuration", () => {
       database_id: databaseId,
       migrations_dir: resolve(root, "apps/api/migrations"),
     });
+    expect(config.ai).toMatchObject({ binding: "AI" });
     expect(config.vars.APP_MODE).toBe("live");
     expect(config.triggers).toEqual(base.triggers);
     expect(config.durable_objects).toEqual(base.durable_objects);
