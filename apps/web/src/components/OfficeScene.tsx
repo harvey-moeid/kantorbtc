@@ -348,53 +348,51 @@ function Person({
       !frame.complete &&
       index < 11 &&
       (progress > 0 || (frame.stage === "scanner_travel" && index < 4));
-  const seated = participating && progress >= 0.99;
+  const travelProgress = useRef(0);
+  const seated = participating && travelProgress.current >= 0.99;
   const bodyOffset = seated ? -0.15 : 0;
-  const meetingTarget = useMemo(
-    () =>
-      meetingPosition(
-        index,
-        reduced ||
-          (quality === "low" && index !== frame?.speaker && index % 4 > 1)
-          ? progress >= 0.5
-            ? 1
-            : 0
-          : progress,
-      ),
-    [index, progress, reduced, quality, frame?.speaker],
-  );
   useFrame(({ clock }, dt) => {
     if (!ref.current) return;
     const t = clock.elapsedTime;
     joints.forEach((joint, i) => {
       previousPose.current[i] = joint.current?.rotation.x || 0;
     });
-    idleClock.current += Math.min(dt, 0.25);
+    if (!frame && travelProgress.current === 0)
+      idleClock.current += Math.min(dt, 0.25);
     if (Math.floor(idleClock.current * 2) !== lastRoutine.current) {
       lastRoutine.current = Math.floor(idleClock.current * 2);
       routine.current = idleRoutine(index, idleClock.current);
     }
-    const target = participating
-      ? meetingTarget
-      : reduced
+    const desiredProgress = participating ? progress : 0;
+    // Track normal playback (including 4x); smooth larger seek/stop jumps.
+    const step = Math.min(dt, 0.25) * 4;
+    travelProgress.current += THREE.MathUtils.clamp(
+      desiredProgress - travelProgress.current,
+      -step,
+      step,
+    );
+    const travelling = participating || travelProgress.current > 0;
+    const target = travelling
+      ? meetingPosition(index, travelProgress.current)
+      : frame || reduced
         ? homes[index]
         : routine.current.position;
     destination.current.set(...target);
-    position.current.lerp(
-      destination.current,
-      reduced ? 1 : Math.min(1, dt * 5),
-    );
+    const previousPosition = position.current.clone();
+    if (travelling) position.current.copy(destination.current);
+    else position.current.lerp(destination.current, Math.min(1, dt * 5));
     ref.current.position.copy(position.current);
     const walking =
       !reduced &&
-      (participating ? progress > 0 && progress < 1 : routine.current.moving);
+      position.current.distanceToSquared(previousPosition) > 0.000001;
+    const seated = participating && travelProgress.current >= 0.999;
     ref.current.position.y +=
       Math.sin(t * (walking ? 8 : 1.7) + index) *
       (reduced ? 0 : walking ? 0.045 : 0.012);
     const phase = t * 6.5 + index * 0.7;
     const activity = routine.current.activity;
-    const speaking = participating && frame?.speaker === index;
-    const working = !participating && activity === "work" && !walking;
+    const speaking = seated && frame?.speaker === index;
+    const working = !travelling && activity === "work" && !walking;
     const sitting = seated || (working && index < 11);
     if (body.current) {
       const poseY = seated ? -0.15 : sitting ? -0.2 : 0;
@@ -541,11 +539,11 @@ function Person({
               : Math.PI / 2;
     else if (
       walking &&
-      position.current.distanceToSquared(destination.current) > 0.001
+      position.current.distanceToSquared(previousPosition) > 0.000001
     ) {
       const facing = Math.atan2(
-        destination.current.x - position.current.x,
-        destination.current.z - position.current.z,
+        position.current.x - previousPosition.x,
+        position.current.z - previousPosition.z,
       );
       ref.current.rotation.y +=
         Math.atan2(
@@ -784,13 +782,13 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
     <>
       <group visible={downstairs}>
         <Box
-          at={[0, -0.15, 0]}
-          size={[12.3, 0.3, 8.4]}
+          at={[1.5, -0.15, 0]}
+          size={[15.3, 0.3, 8.4]}
           color="#ffffff"
           surface="oak"
           roughness={0.72}
         />
-        <Box at={[0, -0.34, 0]} size={[12.5, 0.09, 8.6]} color="#666d5f" />
+        <Box at={[1.5, -0.34, 0]} size={[15.5, 0.09, 8.6]} color="#666d5f" />
         <Box at={[-6, 1.5, 0]} size={[0.12, 3, 8.2]} color="#d5d0be" />
         <Box at={[0, 1.5, -4.06]} size={[12, 3, 0.13]} color="#213c40" />
         {[-4.7, -2.35, 0, 2.35, 4.7].map((x) => (
@@ -852,19 +850,25 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
           onClick={() => onChart("xauusd")}
         />
         <Plant x={-5.6} z={3.55} />
-        <Plant x={2.9} z={2.8} />
+        <Plant x={6.7} z={-3.4} />
         <Plant x={-5.5} z={-3.4} />
       </group>
       <group visible={upstairs}>
         <Box
-          at={[0, 2.98, -1.6]}
-          size={[12.3, 0.22, 5]}
+          at={[8, 2.98, 0.8]}
+          size={[1.5, 0.22, 2.4]}
+          color="#ffffff"
+          surface="oak"
+        />
+        <Box
+          at={[0.65, 2.98, -1.05]}
+          size={[13.3, 0.22, 6.1]}
           color="#ffffff"
           surface="oak"
           roughness={0.72}
         />
         <Box at={[0, 2.84, -0.0]} size={[12.25, 0.07, 0.2]} color="#313e39" />
-        <Box at={[0, 4.55, -4]} size={[12.2, 3.0, 0.13]} color="#253e42" />
+        <Box at={[1.5, 4.55, -4]} size={[15.2, 3.0, 0.13]} color="#253e42" />
         <Box at={[-6, 4.55, -1.6]} size={[0.12, 3, 5]} color="#d5d0be" />
         {[-3, 3.25].map((x) => (
           <group key={x}>
@@ -914,15 +918,15 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
         />
         <Desk x={-4.5} z={-2.5} y={3.1} />
         <Desk x={-4.5} z={-0.9} y={3.1} />
-        <Desk x={4.55} z={-2.2} y={3.1} color="#8c7057" double />
+        <Desk x={5.5} z={-2.2} y={3.1} color="#8c7057" double />
         <RoomLabel position={[-4.5, 4.9, -0.2]}>RISK & REWARD</RoomLabel>
         <RoomLabel position={[0.3, 5.75, -3.8]}>THE WAR ROOM</RoomLabel>
-        <RoomLabel position={[4.6, 5, -0.3]}>DIRECTOR</RoomLabel>
+        <RoomLabel position={[5.5, 5, -0.3]}>DIRECTOR</RoomLabel>
         <Plant x={-5.55} z={0.3} y={3.1} />
         <Plant x={3.65} z={-3.4} y={3.1} />
         <Box
-          at={[0, 3.7, 0.85]}
-          size={[12.0, 1.2, 0.04]}
+          at={[1.5, 3.7, 1.95]}
+          size={[15.0, 1.2, 0.04]}
           color="#b1c9ba"
           transparent
           opacity={0.17}
@@ -930,18 +934,22 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
         {[-6, -3, 0, 3, 6].map((x) => (
           <Box
             key={x}
-            at={[x, 3.68, 0.85]}
+            at={[x, 3.68, 1.95]}
             size={[0.045, 1.25, 0.045]}
             color="#617367"
           />
         ))}
-        <Box at={[0, 4.32, 0.85]} size={[12.15, 0.045, 0.07]} color="#809182" />
+        <Box
+          at={[1.5, 4.32, 1.95]}
+          size={[15.15, 0.045, 0.07]}
+          color="#809182"
+        />
       </group>
       <OfficeInterior upstairs={upstairs} downstairs={downstairs} />
       {Array.from({ length: 12 }, (_, i) => (
         <RoundedBox
           key={i}
-          position={[5.7, 0.25 + i * 0.25, 3.7 - i * 0.29]}
+          position={[8, 0.25 + i * 0.25, 3.7 - i * 0.29]}
           args={[0.95, 0.065, 0.35]}
           radius={0.018}
           smoothness={2}
@@ -951,7 +959,7 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
           <SurfaceMaterial surface="oak" />
         </RoundedBox>
       ))}
-      {[5.34, 6.06].map((x) => (
+      {[7.55, 8.45].map((x) => (
         <mesh
           key={x}
           position={[x, 1.48, 2.1]}
@@ -966,7 +974,7 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
           />
         </mesh>
       ))}
-      <mesh position={[6.04, 2.45, 2]} rotation={[0.71, 0, 0]}>
+      <mesh position={[8.45, 2.45, 2]} rotation={[0.71, 0, 0]}>
         <boxGeometry args={[0.05, 0.06, 4.7]} />
         <meshStandardMaterial
           color="#c6a878"
@@ -977,7 +985,7 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
       {[0, 3, 6, 9, 11].map((i) => (
         <Box
           key={`rail-${i}`}
-          at={[6.04, 0.6 + i * 0.25, 3.7 - i * 0.29]}
+          at={[8.45, 0.6 + i * 0.25, 3.7 - i * 0.29]}
           size={[0.035, 1, 0.035]}
           color="#354e50"
         />
@@ -1012,11 +1020,11 @@ function CameraRig({
     const close = view === "interior";
     const centerY = floor === "1" ? 0.35 : floor === "2" ? 2.85 : 1.65;
     camera.position.set(
-      (close ? 8.4 : 11.8) * fit,
+      1.5 + (close ? 9.4 : 14) * fit,
       centerY + (close ? 4.8 : 9.3) * fit,
-      (close ? 9.5 : 14.3) * fit,
+      (close ? 10.5 : 16) * fit,
     );
-    controls.current?.target.set(close ? -0.7 : 0, centerY, close ? 0.15 : 0);
+    controls.current?.target.set(close ? 0.5 : 1.5, centerY, close ? 0.15 : 0);
     controls.current?.update();
   }, [floor, reset, view, camera, size.width, size.height]);
   useFrame((_, delta) => {

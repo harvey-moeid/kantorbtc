@@ -52,11 +52,24 @@ describe("office paths and capacity", () => {
       for (let p = 0; p < 1; p += 0.005) {
         const [x, y, z] = meetingPosition(i, p);
         if (y > 0 && y < 3.1) {
-          expect(x).toBeCloseTo(5.7);
+          expect(x).toBeCloseTo(8);
           expect(z).toBeGreaterThanOrEqual(0.22);
           expect(z).toBeLessThanOrEqual(3.7);
         }
       }
+  });
+  it("routes meeting participants around the table and director suite", () => {
+    for (let i = 0; i < 11; i++) {
+      for (let p = 0; p <= 1; p += 0.002) {
+        const [x, y, z] = meetingPosition(i, p);
+        if (y === 3.1) {
+          expect(x > -1.55 && x < 2.05 && z > -2.12 && z < -0.78).toBe(false);
+          if (i < 8 && x > 3.25 && x < 7.5) expect(z).toBeGreaterThan(0.8);
+        }
+        if (y === 0 && i < 4 && z > 1.6 && z < 2.9)
+          expect(x).toBeGreaterThanOrEqual(2.7);
+      }
+    }
   });
   it("does not put RR staff and director downstairs", () => {
     for (let i = 8; i < 11; i++)

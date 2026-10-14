@@ -23,6 +23,8 @@ python - <<'PY'
 import socket
 for port in (5173, 8787):
     with socket.socket() as sock:
+        # Ignore TIME_WAIT sockets from a completed run, but refuse live listeners.
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind(('0.0.0.0', port))
         except OSError:

@@ -10,7 +10,7 @@ export const homes: Point[] = [
   [1.4, 0, 3],
   [-4.1, 3.1, -1.7],
   [-4.1, 3.1, -0.1],
-  [4.45, 3.1, -1.3],
+  [5.5, 3.1, -1.3],
   [3.8, 0, 3.1],
   [-4.5, 0, -1.65],
 ];
@@ -48,10 +48,23 @@ export function pathAt(points: Point[], progress: number): Point {
 export function meetingPosition(index: number, progress: number): Point {
   const home = homes[index],
     seat = seats[index] || home;
+  const approach: Point[] =
+    seat[2] < -2
+      ? [[3, 3.1, 1.65], [3, 3.1, -3.05], [seat[0], 3.1, -3.05], seat]
+      : [[seat[0], 3.1, 1.65], seat];
   return pathAt(
     index < 8
-      ? [home, [5.7, 0, 3.7], [5.7, 3.1, 0.22], [4.4, 3.1, 0.55], seat]
-      : [home, seat],
+      ? [
+          home,
+          [home[0], 0, index < 4 ? 1.4 : 3.7],
+          [2.7, 0, index < 4 ? 1.4 : 3.7],
+          [2.7, 0, 3.7],
+          [8, 0, 3.7],
+          [8, 3.1, 0.22],
+          [8, 3.1, 1.65],
+          ...approach,
+        ]
+      : [home, [home[0], 3.1, 1.65], ...approach],
     progress,
   );
 }

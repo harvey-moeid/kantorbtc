@@ -213,10 +213,28 @@ export default function SettingsPage() {
                 description="Empat kelompok dievaluasi pada candle yang sudah close."
               />
               <div className="callout">
-                Margin tie-breaker dan durasi sinyal belum diputuskan dalam PRD.
-                Nilai kosong menonaktifkan tie-breaker dan penerbitan sinyal
-                live untuk timeframe tersebut.
+                Voting memerlukan 3 dari 4 AI searah. Seri 2–2 hanya lolos jika
+                jumlah kelompok scanner pendukung lebih banyak, minimal kelompok
+                terpenuhi, dan selisih total skornya mencapai margin.
+                Rekomendasi: margin 30 poin; TTL 5m = 30 menit, 15m = 90 menit,
+                H1 = 6 jam, H4 = 24 jam, D1 = 5 hari. Nilai dapat Anda ubah.
+                Kosongkan margin untuk menonaktifkan tie-breaker; kosongkan TTL
+                untuk menonaktifkan penerbitan sinyal pada timeframe tersebut.
               </div>
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    tieMargin: defaultSettings.tieMargin,
+                    ttl: { ...defaultSettings.ttl },
+                  })
+                }
+              >
+                Gunakan rekomendasi TTL & voting
+              </button>
+              <p>Perubahan diterapkan setelah Anda menekan Simpan.</p>
               {(Object.keys(groupNames) as (keyof typeof groupNames)[]).map(
                 (g) => (
                   <label className="settings-row" key={g}>
@@ -276,7 +294,10 @@ export default function SettingsPage() {
               <label className="settings-row">
                 <div>
                   <b>Margin total skor tie-breaker</b>
-                  <p>Kosong = belum dikonfigurasi / nonaktif.</p>
+                  <p>
+                    Selisih total skor pendukung dan lawan; default 30 poin.
+                    Kosong = nonaktif.
+                  </p>
                 </div>
                 <input
                   type="number"
@@ -318,14 +339,23 @@ export default function SettingsPage() {
                 )}
               </div>
               <h3>Masa berlaku sinyal (menit)</h3>
+              <p>
+                TTL dihitung sejak sinyal dibuat, tetap berjalan setelah entry
+                dan saat pasar tutup. Sinyal yang belum selesai menjadi
+                kedaluwarsa ketika TTL habis. Mengubah TTL tidak mengubah sinyal
+                yang sudah terbit.
+              </p>
               <div className="form-grid">
                 {timeframes.map((tf) => (
                   <label className="form-field" key={tf}>
                     {tf}
                     <input
                       type="number"
-                      min={1}
-                      placeholder="Belum dipilih"
+                      min={
+                        { "5m": 5, "15m": 15, H1: 60, H4: 240, D1: 1440 }[tf]
+                      }
+                      step={1}
+                      placeholder="Nonaktif"
                       value={form.ttl[tf] === null ? "" : form.ttl[tf]! / 60}
                       onChange={(e) =>
                         setForm({
