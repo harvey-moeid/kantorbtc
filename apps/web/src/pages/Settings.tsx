@@ -42,6 +42,7 @@ export default function SettingsPage() {
     [form, setForm] = useState<Settings>(structuredClone(current)),
     [tab, setTab] = useState("general"),
     [busy, setBusy] = useState(false),
+    [workersAI, setWorkersAI] = useState(false),
     [credentials, setCredentials] = useState<
       {
         provider: string;
@@ -67,8 +68,13 @@ export default function SettingsPage() {
     t = useT();
   useEffect(() => {
     if (!demo) {
-      api<{ credentials: typeof credentials }>("/settings/api")
-        .then((d) => setCredentials(d.credentials))
+      api<{ credentials: typeof credentials; workersAI: boolean }>(
+        "/settings/api",
+      )
+        .then((d) => {
+          setCredentials(d.credentials);
+          setWorkersAI(d.workersAI);
+        })
         .catch((e) => useStore.getState().notify(e.message));
       api<{ slots: typeof slotModels }>("/settings/ai")
         .then((d) => setSlotModels(d.slots))
@@ -473,6 +479,7 @@ export default function SettingsPage() {
               <div className="provider-list">
                 {providers.map((p) => {
                   const credential = credentials.find((c) => c.provider === p);
+                  const aiActive = p === "Workers AI" && workersAI && !demo;
                   return (
                     <div key={p}>
                       <span className="provider-letter">
@@ -482,22 +489,28 @@ export default function SettingsPage() {
                         <b>{p}</b>
                         <small>
                           {p === "Workers AI"
-                            ? "Binding Cloudflare AI"
+                            ? demo
+                              ? "Binding tidak diperiksa dalam demo"
+                              : workersAI
+                                ? "Binding Cloudflare AI tersedia"
+                                : "Binding AI belum terpasang pada Worker"
                             : credential
                               ? `••••${credential.last4}`
                               : "Belum terhubung"}
                         </small>
                       </div>
-                      <Badge tone={credential ? "green" : ""}>
-                        {credential?.test_status === "valid"
-                          ? "VALID"
-                          : credential?.test_status === "failed"
-                            ? "GAGAL"
-                            : credential
-                              ? "TERKONFIGURASI"
-                              : "BELUM AKTIF"}
+                      <Badge tone={aiActive || credential ? "green" : ""}>
+                        {aiActive
+                          ? "TERKONFIGURASI"
+                          : credential?.test_status === "valid"
+                            ? "VALID"
+                            : credential?.test_status === "failed"
+                              ? "GAGAL"
+                              : credential
+                                ? "TERKONFIGURASI"
+                                : "BELUM AKTIF"}
                       </Badge>
-                      {credential && (
+                      {(credential || aiActive) && (
                         <button
                           className="text-button"
                           disabled={busy}

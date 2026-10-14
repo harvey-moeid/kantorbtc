@@ -90,6 +90,31 @@ describe("environment password login", () => {
     delete env.ADMIN_PASSWORD;
     expect((await login("fixture-password")).status).toBe(503);
   });
+  it.each([undefined, "not-hex", "ab".repeat(31)])(
+    "reports invalid encryption setup without exposing submitted keys (%s)",
+    async (key) => {
+      env.ENCRYPTION_KEY = key;
+      const response = await login("fixture-password");
+      const cookie = response.headers.get("set-cookie")!.split(";")[0];
+      const result = await app.request(
+        "https://kantor.test/api/settings/api/Gemini",
+        {
+          method: "PUT",
+          headers: {
+            Origin: "https://kantor.test",
+            Cookie: cookie,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ value: "private-test-key" }),
+        },
+        env,
+      );
+      expect(result.status).toBe(503);
+      const body = await result.text();
+      expect(body).toContain("ENCRYPTION_KEY");
+      expect(body).not.toContain("private-test-key");
+    },
+  );
   it("retains login rate limiting", async () => {
     for (let i = 0; i < 8; i++) expect((await login("wrong")).status).toBe(401);
     expect((await login("fixture-password")).status).toBe(429);
