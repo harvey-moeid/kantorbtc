@@ -69,9 +69,9 @@ Satu Cloudflare Worker melayani Hono API dan aset statis Vite, sesuai alternatif
 
 ## Aturan PRD yang masih terbuka
 
-`tieMargin` dan `ttl` per timeframe **kosong secara default**. Tie-breaker nonaktif sampai margin dipilih; sinyal live tidak diterbitkan untuk timeframe tanpa TTL. Nilai durasi contoh pada demo bukan keputusan pengguna.
+`tieMargin` default **30 poin total skor**. Voting tetap membutuhkan 3/4 AI searah; seri 2–2 hanya lolos bila kelompok scanner pendukung lebih banyak, memenuhi minimum kelompok dan margin. TTL default: **5m 30 menit, 15m 90 menit, H1 6 jam, H4 24 jam, D1 5 hari**. Nilai ini merupakan rekomendasi operasional yang disetujui pemilik dan dapat diedit melalui Pengaturan → Scanner & risiko. Tombol rekomendasi hanya mengisi formulir; Simpan menerapkannya. Konfigurasi tersimpan tidak ditimpa otomatis. Kosongkan margin untuk menonaktifkan tie-breaker atau TTL untuk menonaktifkan penerbitan sinyal timeframe tersebut. Perubahan TTL hanya berlaku untuk sinyal baru.
 
-Untuk implementasi awal, sinyal hanya dianggap masuk ketika **tick yang teramati** berada dalam zona; tidak mengarang sentuhan dari candle atau gap sampling. TTL tetap berjalan setelah entry dan saat pasar tutup. TP1/TP2 dicatat, lalu sinyal selesai saat TP terakhir; SL dapat mengakhiri sinyal lebih dahulu. Ini adalah **kebijakan implementasi sementara**, bukan keputusan final PRD. Pembatalan struktur dan sinyal berlawanan belum diaktifkan. Definisi SMC awal dijelaskan pada `packages/shared/src/structure.ts` dan perlu dikunci sebelum produksi.
+Untuk implementasi awal, sinyal hanya dianggap masuk ketika **tick yang teramati** berada dalam zona; tidak mengarang sentuhan dari candle atau gap sampling. TTL tetap berjalan setelah entry dan saat pasar tutup. TP1/TP2 dicatat, lalu sinyal selesai saat TP terakhir; SL dapat mengakhiri sinyal lebih dahulu. TTL yang tetap berjalan sejak penerbitan, setelah entry, dan saat pasar tutup menjadi default operasional. Aturan sentuhan tick tetap merupakan kebijakan implementasi awal. Pembatalan struktur dan sinyal berlawanan belum diaktifkan. Definisi SMC awal dijelaskan pada `packages/shared/src/structure.ts` dan perlu dikunci sebelum produksi.
 
 ## Validasi
 
@@ -91,7 +91,7 @@ python tests/alert_smoke.py
 
 Jalankan kedua server sebelum smoke browser. Screenshot disimpan di `test-results/`, yang diabaikan Git. Tes browser memeriksa privasi publik, perpindahan lantai, karakter, chart/indikator, alert, filter, detail sinyal/meeting, pengaturan, bahasa, dan responsivitas 390 px. Smoke alert memeriksa edit numerik, validasi harga, drag desktop/sentuhan ponsel, batal/konfirmasi, keyboard, isolasi aset, dan bahwa demo tidak mengirim perubahan ke API privat.
 
-161 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
+173 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
 
 Alert aktif yang belum terpicu ditampilkan sebagai garis pada chart. Geser pegangan garis untuk memilih level baru lalu konfirmasikan di formulir, atau gunakan tombol **Ubah alert** untuk mengisi harga langsung. Enter/Space pada pegangan membuka editor yang sama. Menutup formulir mempertahankan level tersimpan. Alert terpicu/nonaktif tidak bisa diedit atau diaktifkan ulang melalui perubahan harga; buat alert baru bila diperlukan. Mode demo hanya mengubah state sesi lokal, sedangkan workspace privat menyimpan perubahan di D1.
 
@@ -109,7 +109,7 @@ Pipeline GitHub Actions untuk CI, smoke browser, dan deployment production dijel
 
 Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 
-1. Autentikasi Wrangler ke akun Cloudflare pemilik. Buat D1 `kantor-db`, lalu ganti `database_id` placeholder di `wrangler.jsonc` dengan ID sebenarnya.
+1. Autentikasi Wrangler ke akun Cloudflare pemilik. Workflow production sudah menetapkan target D1 `kantor-db` dan script deployment mengganti placeholder lokal dengan `CLOUDFLARE_D1_DATABASE_ID`. Verifikasi binding dan migrasi pada deployment aktual; konfigurasi repository saja belum membuktikan operasi database remote.
 2. Tetapkan secrets `ADMIN_PASSWORD` dan `ENCRYPTION_KEY` melalui penyimpanan secret Cloudflare. Isi `ADMIN_PASSWORD` dengan password biasa, bukan hash; kunci AES berupa 64 digit hex. Jangan commit `.dev.vars` atau memasukkan kredensial ke frontend. Jangan mengganti kunci enkripsi tanpa migrasi ciphertext.
 3. Opsional: tambahkan `"ai": { "binding": "AI" }` di konfigurasi untuk Workers AI. Tetapkan `OANDA_ACCOUNT_ID` dan `OANDA_ENV` jika memakai OANDA pricing. Atur model/plan dan API key melalui halaman API setelah login.
 4. Terapkan migrasi D1 remote secara sengaja, build, lalu deploy Worker. Untuk pengujian pertama pertahankan `APP_MODE=demo`; aktifkan live sesudah memvalidasi konfigurasi, key, aturan scanner, TTL, dan lisensi.

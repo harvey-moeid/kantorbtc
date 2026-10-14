@@ -71,7 +71,10 @@ describe("deterministic risk and approval engine", () => {
               tp: [66600],
             },
     }));
-    expect(decide(votes, demoScanner).approved).toBe(false);
+    expect(
+      decide(votes, demoScanner, { ...defaultSettings, tieMargin: null })
+        .approved,
+    ).toBe(false);
     expect(
       decide(votes, demoScanner, { ...defaultSettings, tieMargin: 30 }),
     ).toMatchObject({ approved: true, tieBreaker: true, direction: "long" });
@@ -121,12 +124,27 @@ describe("deterministic risk and approval engine", () => {
         "H1",
         demoVotes,
         demoScanner,
-        defaultSettings,
+        { ...defaultSettings, ttl: { ...defaultSettings.ttl, H1: null } },
         "OKX",
         1000,
       ),
     ).toBe(null);
   });
+  it.each(["5m", "15m", "H1", "H4", "D1"] as const)(
+    "publishes %s with the recommended lifetime by default",
+    (tf) => {
+      const signal = makeSignal(
+        "BTCUSDT",
+        tf,
+        demoVotes,
+        demoScanner,
+        defaultSettings,
+        "OKX",
+        1000,
+      );
+      expect(signal?.expiresAt).toBe(1000 + defaultSettings.ttl[tf]! * 1000);
+    },
+  );
   it("creates signal when timeframe lifetime is configured", () => {
     const s = makeSignal(
       "BTCUSDT",

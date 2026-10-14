@@ -68,6 +68,9 @@ with sync_playwright() as p:
  expect(render_stats).not_to_contain_text('PAUSED',timeout=10000)
  # A resumed badge alone is insufficient: the replay must also advance again.
  page.wait_for_function('(before)=>Number(document.querySelector(".meeting-playback input[type=range]").value)>Number(before)',arg=before,timeout=10000)
+ # Desktop checks are complete; release its continuous software-rendered 3D
+ # context before testing the mobile on-demand context.
+ page.close()
  reduced=browser.new_page(viewport={'width':390,'height':844},is_mobile=True,has_touch=True,reduced_motion='reduce')
  reduced.on('pageerror',lambda e:errors.append(str(e)))
  reduced.goto(base,wait_until='networkidle');reduced.get_by_role('button',name='Jelajahi demo',exact=True).click()
@@ -79,7 +82,6 @@ with sync_playwright() as p:
  assert reduced.get_by_role('button',name='Lantai 2',exact=True).get_attribute('class')=='active'
  reduced.evaluate('window.scrollTo(0,0)')
  reduced.screenshot(path='test-results/meeting-mobile.png',full_page=True)
- page.close()
  reduced.close()
  public=browser.new_page(viewport={'width':1200,'height':900})
  public.on('pageerror',lambda e:errors.append(str(e)))

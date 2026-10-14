@@ -8,15 +8,15 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 
 ## P0 — Kunci aturan dan persiapan integrasi
 
-- [ ] Pemilik memilih TTL untuk 5m/15m/H1/H4/D1, apakah TTL terus berjalan setelah entry, serta perlakuan waktu pasar emas tutup. Usulan durasi di PRD tidak otomatis menjadi default.
-- [ ] Tetapkan margin numerik keunggulan scanner untuk voting 2–2 dan finalisasi aturan kuorum/abstain/gagal.
+- [x] Pemilik mengizinkan rekomendasi default: TTL 30 menit/90 menit/6 jam/24 jam/5 hari untuk 5m/15m/H1/H4/D1. Tetap berjalan setelah entry dan saat pasar tutup. Dapat diedit di Pengaturan; konfigurasi tersimpan tetap dipertahankan.
+- [x] Default margin scanner 30 poin untuk voting 2–2; jumlah kelompok pendukung harus lebih banyak dan memenuhi minimum. Mayoritas tetap 3/4, minimal tiga suara non-abstain; gagal setelah satu retry menjadi abstain. Margin dapat diedit atau dikosongkan untuk menonaktifkan tie-breaker.
 - [ ] Tetapkan invalidasi struktur, pembatalan karena sinyal berlawanan, konflik antar timeframe, serta prioritas TP/SL pada kejadian bersamaan atau gap data.
 - [ ] Kunci definisi BOS/CHoCH/FVG/order block, sensitivitas swing, bobot volume dan derivatives, serta kelayakan proxy perpetual emas/COT.
 - [ ] Konfirmasi jumlah staf pendukung, kursi, dan target aset karakter akhir.
 - [ ] Dokumentasikan rekonsiliasi skema/status sinyal dan penyimpanan API key terenkripsi D1 dengan master key di Worker secret.
 - [ ] Siapkan akses Cloudflare/D1, provider emas, empat slot AI, dan channel Discord; pastikan model, kuota, cakupan histori, serta lisensi penggunaan data sesuai kebutuhan.
 
-**Selesai jika:** keputusan dicatat dan konfigurasi tervalidasi; TTL/margin yang belum dipilih tetap kosong. Kredensial masuk melalui secret/UI privat, tanpa masuk Git atau frontend. Implementasi sementara pada `IMPLEMENTATION.md` diganti hanya setelah aturan disepakati.
+**Selesai jika:** keputusan dicatat dan konfigurasi tervalidasi; TTL/margin dapat dikosongkan untuk menonaktifkan penerbitan sinyal/tie-breaker. Kredensial masuk melalui secret/UI privat, tanpa masuk Git atau frontend. Implementasi sementara pada `IMPLEMENTATION.md` diganti hanya setelah aturan disepakati.
 
 ## P1 — Data pasar dan histori yang andal
 

@@ -188,7 +188,7 @@ export function RingPendant({
 }
 export function Lounge() {
   return (
-    <group position={[2.65, 0, 3.45]}>
+    <group position={[6.2, 0, -1.1]}>
       <SoftShadow scale={[1.6, 1.25]} opacity={0.45} />
       <RoundedBox
         position={[0, 0.075, 0]}

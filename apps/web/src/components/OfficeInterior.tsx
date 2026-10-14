@@ -265,15 +265,19 @@ export default function OfficeInterior({
     <>
       <group visible={downstairs}>
         <SkylineWindow at={[-5.92, 1.75, -1.65]} width={3.6} />
-        <Detail at={[0, -0.38, 0]} size={[12.65, 0.18, 8.7]} color="#142b30" />
         <Detail
-          at={[0, -0.24, 4.22]}
-          size={[12.4, 0.025, 0.035]}
+          at={[1.5, -0.38, 0]}
+          size={[15.65, 0.18, 8.7]}
+          color="#142b30"
+        />
+        <Detail
+          at={[1.5, -0.24, 4.22]}
+          size={[15.4, 0.025, 0.035]}
           color="#e7c995"
           glow
         />
         <Detail
-          at={[6.15, -0.24, 0]}
+          at={[9.15, -0.24, 0]}
           size={[0.035, 0.025, 8.4]}
           color="#75c9c0"
           glow
@@ -316,7 +320,7 @@ export default function OfficeInterior({
           glow
         />
         <Slats at={[-5.85, 4.55, -3.87]} count={21} height={2.8} />
-        <Slats at={[3.3, 4.55, -3.87]} count={19} height={2.8} />
+        <Slats at={[3.3, 4.55, -3.87]} count={29} height={2.8} />
         <Detail
           at={[0.3, 3.115, -1.45]}
           size={[5.6, 0.025, 3.95]}
@@ -334,8 +338,44 @@ export default function OfficeInterior({
           text="THE EDGE"
           sub="RISK / DISCIPLINE / PERSPECTIVE"
         />
+        {/* Executive suite: walnut, brass, a private lounge and clear corridor. */}
+        <Detail
+          at={[5.45, 3.115, -1.45]}
+          size={[4.2, 0.025, 4.1]}
+          color="#213c40"
+        />
+        <Detail
+          at={[7.55, 4.4, -1.6]}
+          size={[0.08, 2.6, 4.7]}
+          color="#76513c"
+        />
+        <Detail
+          at={[5.5, 3.88, -2.2]}
+          size={[2.8, 0.09, 1.1]}
+          color="#142b30"
+        />
+        <Detail
+          at={[5.5, 3.8, -1.65]}
+          size={[2.8, 0.035, 0.035]}
+          color="#e7c995"
+          glow
+        />
+        <RingPendant at={[5.5, 5.7, -1.6]} radius={1.1} />
+        <Detail at={[6.8, 3.48, 0]} size={[0.75, 0.75, 1.3]} color="#25413d" />
+        <Detail
+          at={[6.8, 3.95, 0.5]}
+          size={[0.75, 0.65, 0.18]}
+          color="#25413d"
+        />
+        <Detail at={[5.7, 3.48, 0]} size={[0.65, 0.12, 0.9]} color="#76513c" />
+        <Detail
+          at={[5.5, 5.9, -3.8]}
+          size={[4.2, 0.04, 0.08]}
+          color="#ffdaa0"
+          glow
+        />
         <WallArt
-          at={[4.5, 5.35, -3.76]}
+          at={[5.5, 5.35, -3.76]}
           text="FOUNDER"
           sub="VISION BEYOND THE CHART"
         />

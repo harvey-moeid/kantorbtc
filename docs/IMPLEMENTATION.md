@@ -22,7 +22,7 @@ Kode adalah fondasi MVP yang berjalan lokal; matriks ini memisahkan fitur lokal 
 
 ## Kebijakan implementasi sementara
 
-Bagian 21 PRD belum final. Aplikasi tidak memilih angka TTL atau margin tie-breaker secara diam-diam. Admin perlu menetapkannya. Pelacakan awal mengandalkan tick teramati, TTL terus berjalan, TP terakhir menutup sinyal, dan belum melakukan pembatalan otomatis pada konflik. Tidak ada klaim profit, kualitas sinyal, lisensi publik, atau kemampuan eksekusi order.
+Pemilik mengizinkan rekomendasi operasional TTL dan voting: TTL default 5m/15m/H1/H4/D1 = 30 menit/90 menit/6 jam/24 jam/5 hari; margin scanner untuk seri 2–2 = 30 poin, dengan jumlah kelompok pendukung lebih banyak. Mayoritas tetap 3/4 AI. Nilai dapat diedit atau dinonaktifkan dengan mengosongkan kolom pada Pengaturan → Scanner & risiko. Tombol rekomendasi hanya mengisi TTL/margin tanpa mereset pengaturan lain; Simpan menerapkannya. Konfigurasi tersimpan tidak ditimpa otomatis; perubahan TTL hanya berlaku untuk sinyal baru. Aturan pembatalan/konflik bagian 21 PRD masih terbuka. Pelacakan awal mengandalkan tick teramati, TTL terus berjalan, TP terakhir menutup sinyal, dan belum melakukan pembatalan otomatis pada konflik. Tidak ada klaim profit, kualitas sinyal, lisensi publik, atau kemampuan eksekusi order.
 
 ## Pengujian dalam sesi implementasi
 
@@ -39,3 +39,7 @@ Bagian 21 PRD belum final. Aplikasi tidak memilih angka TTL atau margin tie-brea
 - Wrangler lokal biasa tidak meneruskan outbound workerd melalui proxy; DNS provider gagal. Runner Miniflare menggunakan `outboundService`, proxy HTTP/WebSocket lingkungan, dan verifikasi TLS standar. Remote Worker belum diperiksa.
 
 Target prioritas berikutnya adalah validasi akun emas/AI dan deployment nyata, penyelesaian aturan PRD bagian 21, gold streaming, gap recovery/backfill quota, fallback derivatives/provider AI, i18n seluruh panel/Discord, aset karakter rigged, serta pengukuran perangkat HP.
+
+## Pembaruan kantor dan pengaturan
+
+Kantor diperlebar, suite direktur dilengkapi walnut/kuningan, lampu gantung dan area tamu. Tangga berada di sisi kanan di luar suite, dengan bordes dan koridor lantai dua. Lounge bawah dipindahkan dari jalur sirkulasi. Jalur meeting menghindari meja kerja dan meja rapat; perjalanan Low tidak lagi dibulatkan menjadi home/seat. Replay normal sampai 4× mengikuti progres presentasi; seek/hentikan replay mengejar target di sepanjang jalur, dan karakter pulang melalui tangga. Gestur bicara menunggu karakter tiba di kursi. Performa dan tampilan pada HP nyata tetap perlu pengujian.
