@@ -266,19 +266,19 @@ export default function OfficeInterior({
       <group visible={downstairs}>
         <SkylineWindow at={[-5.92, 1.75, -1.65]} width={3.6} />
         <Detail
-          at={[1.5, -0.38, 0]}
-          size={[15.65, 0.18, 8.7]}
+          at={[1.5, -0.38, 0.8]}
+          size={[15.65, 0.18, 10.3]}
           color="#142b30"
         />
         <Detail
-          at={[1.5, -0.24, 4.22]}
+          at={[1.5, -0.24, 5.82]}
           size={[15.4, 0.025, 0.035]}
           color="#e7c995"
           glow
         />
         <Detail
-          at={[9.15, -0.24, 0]}
-          size={[0.035, 0.025, 8.4]}
+          at={[9.15, -0.24, 0.8]}
+          size={[0.035, 0.025, 10]}
           color="#75c9c0"
           glow
         />

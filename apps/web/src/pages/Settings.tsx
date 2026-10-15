@@ -14,6 +14,7 @@ import {
   defaultSettings,
   groupNames,
   staff,
+  staffName,
   timeframes,
   settingsSchema,
   type Settings,
@@ -22,6 +23,10 @@ import { api, useStore } from "../store";
 import { useT } from "../i18n";
 import { Badge, Modal, PageTitle } from "../components/UI";
 import DataOperations from "../components/DataOperations";
+import {
+  providerModels,
+  defaultAISlots,
+} from "../../../../packages/shared/src/ai-models";
 export const providers = [
   "Workers AI",
   "Gemini",
@@ -53,18 +58,9 @@ export default function SettingsPage() {
     >([]),
     [provider, setProvider] = useState(""),
     [keyValue, setKeyValue] = useState(""),
-    [slotModels, setSlotModels] = useState([
-      {
-        provider: "Workers AI",
-        model: "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
-      },
-      { provider: "Gemini", model: "gemini-2.5-flash" },
-      { provider: "Groq", model: "llama-3.3-70b-versatile" },
-      {
-        provider: "OpenRouter",
-        model: "mistralai/mistral-small-3.2-24b-instruct",
-      },
-    ]),
+    [slotModels, setSlotModels] = useState(() =>
+      structuredClone(demo ? useStore.getState().demoAISlots : defaultAISlots),
+    ),
     t = useT();
   useEffect(() => {
     if (!demo) {
@@ -154,6 +150,32 @@ export default function SettingsPage() {
                 title="Umum & tampilan"
                 description="Sesuaikan kantor dengan perangkat dan preferensi Anda."
               />
+              <h3>Nama karakter</h3>
+              <p>
+                Nama tampil di kantor 3D, daftar tim, dan presentasi. Maksimal
+                32 karakter.
+              </p>
+              <div className="form-grid">
+                {staff.map((person) => (
+                  <label className="form-field" key={person.id}>
+                    {person.role}
+                    <input
+                      aria-label={`Nama ${person.name}`}
+                      maxLength={32}
+                      value={form.staffNames?.[person.id] ?? person.name}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          staffNames: {
+                            ...form.staffNames,
+                            [person.id]: e.target.value,
+                          },
+                        })
+                      }
+                    />
+                  </label>
+                ))}
+              </div>
               <label className="settings-row">
                 <div>
                   <b>Bahasa antarmuka</b>
@@ -320,6 +342,89 @@ export default function SettingsPage() {
                   }
                 />
               </label>
+              <h3>Strategi scanner</h3>
+              <p>
+                Aturan ini digunakan pada candle close berikutnya setelah
+                disimpan.
+              </p>
+              <label className="settings-row">
+                <div>
+                  <b>Strategi SMC / ICT</b>
+                  <p>
+                    Pilih breakout struktur, liquidity sweep, atau keduanya.
+                  </p>
+                </div>
+                <select
+                  aria-label="Strategi SMC"
+                  value={form.strategy.smcMode}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      strategy: {
+                        ...form.strategy,
+                        smcMode: e.target
+                          .value as Settings["strategy"]["smcMode"],
+                      },
+                    })
+                  }
+                >
+                  <option value="both">Breakout + liquidity sweep</option>
+                  <option value="breakout">Breakout struktur</option>
+                  <option value="sweep">Liquidity sweep</option>
+                </select>
+              </label>
+              {(
+                [
+                  [
+                    "rsiLower",
+                    "Batas bawah RSI short",
+                    "Short membutuhkan RSI di atas batas ini dan di bawah 50.",
+                    0,
+                    49,
+                    1,
+                  ],
+                  [
+                    "rsiUpper",
+                    "Batas atas RSI long",
+                    "Long membutuhkan RSI di atas 50 dan di bawah batas ini.",
+                    51,
+                    100,
+                    1,
+                  ],
+                  [
+                    "volumeRatio",
+                    "Rasio minimum volume",
+                    "Volume candle dibanding rata-rata volume swing.",
+                    0.1,
+                    10,
+                    0.05,
+                  ],
+                  [
+                    "oiChange",
+                    "Minimum perubahan open interest",
+                    "Rasio perubahan OI; 0.01 berarti 1%.",
+                    0,
+                    1,
+                    0.005,
+                  ],
+                ] as const
+              ).map(([key, label, hint, min, max, step]) => (
+                <NumberSetting
+                  key={key}
+                  label={label}
+                  hint={hint}
+                  min={min}
+                  max={max}
+                  step={step}
+                  value={form.strategy[key]}
+                  onChange={(v) =>
+                    setForm({
+                      ...form,
+                      strategy: { ...form.strategy, [key]: v },
+                    })
+                  }
+                />
+              ))}
               <h3>Parameter indikator</h3>
               <div className="form-grid">
                 {(["emaFast", "emaSlow", "rsiPeriod", "swing"] as const).map(
@@ -391,6 +496,10 @@ export default function SettingsPage() {
                 Provider perlu kredensial aktif. Jika slot gagal setelah satu
                 retry, hasilnya abstain. Tanpa kuorum tidak ada sinyal.
               </div>
+              <p>
+                Daftar model adalah saran, bukan pemeriksaan ketersediaan akun.
+                Anda juga dapat memasukkan ID model kustom.
+              </p>
               {slotModels.map((slot, i) => (
                 <div className="ai-slot" key={i}>
                   <span
@@ -401,11 +510,11 @@ export default function SettingsPage() {
                       } as React.CSSProperties
                     }
                   >
-                    {staff[i + 4].name[0]}
+                    {staffName(staff[i + 4], current)[0]}
                   </span>
                   <div>
                     <b>
-                      Slot {i + 1} · {staff[i + 4].name}
+                      Slot {i + 1} · {staffName(staff[i + 4], current)}
                     </b>
                     <div className="form-grid">
                       <select
@@ -414,7 +523,12 @@ export default function SettingsPage() {
                         onChange={(e) =>
                           setSlotModels(
                             slotModels.map((s, j) =>
-                              j === i ? { ...s, provider: e.target.value } : s,
+                              j === i
+                                ? {
+                                    provider: e.target.value,
+                                    model: providerModels[e.target.value][0],
+                                  }
+                                : s,
                             ),
                           )
                         }
@@ -423,7 +537,38 @@ export default function SettingsPage() {
                           <option key={p}>{p}</option>
                         ))}
                       </select>
+                      <select
+                        aria-label={`Pilihan model slot ${i + 1}`}
+                        value={
+                          providerModels[slot.provider]?.includes(slot.model)
+                            ? slot.model
+                            : "custom"
+                        }
+                        onChange={(e) =>
+                          setSlotModels(
+                            slotModels.map((s, j) =>
+                              j === i
+                                ? {
+                                    ...s,
+                                    model:
+                                      e.target.value === "custom"
+                                        ? ""
+                                        : e.target.value,
+                                  }
+                                : s,
+                            ),
+                          )
+                        }
+                      >
+                        {(providerModels[slot.provider] || []).map((model) => (
+                          <option key={model} value={model}>
+                            {model}
+                          </option>
+                        ))}
+                        <option value="custom">Model kustom…</option>
+                      </select>
                       <input
+                        placeholder="ID model dari provider"
                         aria-label={`Model slot ${i + 1}`}
                         value={slot.model}
                         onChange={(e) =>
@@ -444,13 +589,30 @@ export default function SettingsPage() {
                 onClick={async () => {
                   setBusy(true);
                   try {
-                    if (demo)
+                    const slots = slotModels.map((slot) => ({
+                      ...slot,
+                      model: slot.model.trim(),
+                    }));
+                    if (
+                      slots.some(
+                        (slot) => !slot.model || slot.model.length > 160,
+                      )
+                    )
                       throw new Error(
-                        "Susunan AI live memerlukan login dan backend.",
+                        "Isi ID model untuk keempat slot (maksimal 160 karakter).",
                       );
+                    if (demo) {
+                      useStore.getState().set({ demoAISlots: slots });
+                      useStore
+                        .getState()
+                        .notify(
+                          "Susunan AI demo disimpan di perangkat ini; tidak menjalankan provider live.",
+                        );
+                      return;
+                    }
                     await api("/settings/ai", {
                       method: "PUT",
-                      body: JSON.stringify({ slots: slotModels }),
+                      body: JSON.stringify({ slots }),
                     });
                     useStore.getState().notify("Empat slot AI disimpan.");
                   } catch (e) {

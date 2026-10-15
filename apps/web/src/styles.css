@@ -3109,3 +3109,58 @@ h1 {
     padding-inline: 9px;
   }
 }
+
+.avatar-speech {
+  position: relative;
+  width: 260px;
+  padding: 18px;
+  border: 1px solid #d8e1d3;
+  border-radius: 18px 18px 18px 4px;
+  background: #f7f8f0;
+  color: #263b32;
+  box-shadow: 0 12px 36px #0c201c38;
+  font-family: "DM Sans", sans-serif;
+  text-align: left;
+  pointer-events: auto;
+}
+.avatar-speech::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: calc(50% - 10px);
+  border: 10px solid transparent;
+  border-bottom: 0;
+  border-top-color: #f7f8f0;
+}
+.avatar-speech strong {
+  display: block;
+  padding-right: 22px;
+  font-size: 15px;
+}
+.avatar-speech small {
+  display: block;
+  margin-top: 3px;
+  color: #657b6d;
+  font-size: 11px;
+}
+.avatar-speech p {
+  margin: 12px 0;
+  font-size: 13px;
+  line-height: 1.55;
+  max-height: 145px;
+  overflow: auto;
+}
+.avatar-speech .text-button {
+  color: #345f4a;
+  font-size: 12px;
+}
+.speech-close {
+  position: absolute;
+  right: 10px;
+  top: 8px;
+  border: 0;
+  background: transparent;
+  color: #53695b;
+  cursor: pointer;
+  font-size: 22px;
+}

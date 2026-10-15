@@ -95,6 +95,16 @@ export const settingsSchema = z
   .object({
     language: z.enum(["id", "en"]).default("id"),
     quality: z.enum(["auto", "low", "medium", "high"]).default("auto"),
+    staffNames: z.record(z.string().trim().min(1).max(32)).default({}),
+    strategy: z
+      .object({
+        smcMode: z.enum(["both", "breakout", "sweep"]).default("both"),
+        rsiLower: z.number().min(0).max(49).default(25),
+        rsiUpper: z.number().min(51).max(100).default(75),
+        volumeRatio: z.number().min(0.1).max(10).default(1.15),
+        oiChange: z.number().min(0).max(1).default(0.01),
+      })
+      .default({}),
     minRR: z.number().min(1).max(10).default(1),
     thresholds: z.object({
       smc: z.number().min(0).max(100),
@@ -133,6 +143,14 @@ export type Settings = z.infer<typeof settingsSchema>;
 export const defaultSettings: Settings = {
   language: "id",
   quality: "auto",
+  staffNames: {},
+  strategy: {
+    smcMode: "both",
+    rsiLower: 25,
+    rsiUpper: 75,
+    volumeRatio: 1.15,
+    oiChange: 0.01,
+  },
   minRR: 1,
   thresholds: { smc: 60, indicators: 60, volume: 60, derivatives: 60 },
   enabled: { smc: true, indicators: true, volume: true, derivatives: true },
@@ -259,3 +277,10 @@ export const staff = [
     floor: 1,
   },
 ] as const;
+
+export function staffName(
+  person: { id: string; name: string },
+  settings: Settings,
+): string {
+  return settings.staffNames?.[person.id] || person.name;
+}

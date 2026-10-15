@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import {
   staff,
+  staffName,
   symbols,
   groupNames,
   type Settings,
@@ -38,7 +39,8 @@ import { SignalRows } from "../components/SignalRows";
 const OfficeScene = lazy(() => import("../components/OfficeScene"));
 export function TeamList() {
   const set = useStore((s) => s.set),
-    selected = useStore((s) => s.selectedStaff);
+    selected = useStore((s) => s.selectedStaff),
+    settings = useStore((s) => s.settings);
   return (
     <div className="team-list">
       {staff
@@ -53,11 +55,11 @@ export function TeamList() {
               className="avatar"
               style={{ "--avatar-color": s.color } as React.CSSProperties}
             >
-              {s.name.slice(0, 1)}
+              {staffName(s, settings).slice(0, 1)}
               <i />
             </span>
             <span>
-              <b>{s.name}</b>
+              <b>{staffName(s, settings)}</b>
               <small>{s.role}</small>
             </span>
             <ChevronRight size={14} />
@@ -71,6 +73,7 @@ export function StaffPanel() {
     set = useStore((s) => s.set),
     meetings = useStore((s) => s.meetings),
     demo = useStore((s) => s.demo),
+    settings = useStore((s) => s.settings),
     person = staff.find((s) => s.id === personId);
   if (!person) return null;
   const idx = staff.findIndex((s) => s.id === person.id),
@@ -78,7 +81,7 @@ export function StaffPanel() {
     vote = meetings[0]?.votes[idx - 4];
   return (
     <Modal
-      title={`${person.name} · ${person.role}`}
+      title={`${staffName(person, settings)} · ${person.role}`}
       onClose={() => set({ selectedStaff: null })}
     >
       <div className="staff-profile">
@@ -86,7 +89,7 @@ export function StaffPanel() {
           className="avatar large"
           style={{ "--avatar-color": person.color } as React.CSSProperties}
         >
-          {person.name[0]}
+          {staffName(person, settings)[0]}
         </span>
         <div>
           <Badge tone="green">{person.kind.toUpperCase()}</Badge>
@@ -204,6 +207,7 @@ export default function Office() {
     navigate = useNavigate(),
     floor = useStore((s) => s.floor),
     set = useStore((s) => s.set),
+    settings = useStore((s) => s.settings),
     quality = useStore((s) => s.settings.quality),
     mode2d = useStore((s) => s.mode2d),
     demo = useStore((s) => s.demo),
@@ -293,7 +297,7 @@ export default function Office() {
                   className={floor === f ? "active" : ""}
                   onClick={() => {
                     setFollow(false);
-                    set({ floor: f });
+                    set({ floor: f, speakingStaff: null });
                   }}
                 >
                   {f === "all" ? <Layers size={14} /> : null}
@@ -518,7 +522,7 @@ export default function Office() {
                     className="avatar"
                     style={{ "--avatar-color": p.color } as React.CSSProperties}
                   >
-                    {p.name[0]}
+                    {staffName(p, settings)[0]}
                   </span>
                 ))}
                 <p>4 scanner · 4 AI · 2 RR · 1 bos</p>

@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
   defaultSettings,
+  settingsSchema,
   type Settings,
   type Signal,
   type Quote,
@@ -13,6 +14,10 @@ import {
   demoMeetings,
 } from "../../../packages/shared/src/demo";
 import type { MeetingEvent } from "../../../packages/shared/src/presentation";
+import {
+  defaultAISlots,
+  providerModels,
+} from "../../../packages/shared/src/ai-models";
 export interface PriceAlert {
   id: string;
   symbol: "BTCUSDT" | "XAUUSD";
@@ -28,11 +33,13 @@ interface State {
   meetingPhase: string;
   meetingEvent: MeetingEvent | null;
   settings: Settings;
+  demoAISlots: { provider: string; model: string }[];
   signals: Signal[];
   quotes: Quote[];
   meetings: Meeting[];
   alerts: PriceAlert[];
   selectedStaff: string | null;
+  speakingStaff: string | null;
   floor: "all" | "1" | "2";
   mode2d: boolean;
   notice: string | null;
@@ -78,11 +85,13 @@ export const useStore = create<State>()(
       meetingPhase: "idle",
       meetingEvent: null,
       settings: defaultSettings,
+      demoAISlots: structuredClone(defaultAISlots),
       signals: [],
       quotes: [],
       meetings: [],
       alerts: [],
       selectedStaff: null,
+      speakingStaff: null,
       floor: "all",
       mode2d: false,
       notice: null,
@@ -117,6 +126,7 @@ export const useStore = create<State>()(
           meetingEvent: null,
           meetingPhase: "idle",
           selectedStaff: null,
+          speakingStaff: null,
         }),
       saveSettings: async (settings) => {
         if (!get().demo)
@@ -177,7 +187,33 @@ export const useStore = create<State>()(
     }),
     {
       name: "kantor-preferences-v1",
-      partialize: (s) => ({ settings: s.settings, mode2d: s.mode2d }),
+      merge: (persisted, current) => {
+        const saved = persisted as Partial<State> | undefined;
+        const parsed = settingsSchema.safeParse(saved?.settings);
+        return {
+          ...current,
+          demoAISlots:
+            Array.isArray(saved?.demoAISlots) &&
+            saved.demoAISlots.length === 4 &&
+            saved.demoAISlots.every(
+              (slot) =>
+                slot &&
+                Object.hasOwn(providerModels, slot.provider) &&
+                typeof slot.model === "string" &&
+                slot.model.trim().length > 0 &&
+                slot.model.length <= 160,
+            )
+              ? saved.demoAISlots
+              : current.demoAISlots,
+          mode2d: saved?.mode2d ?? current.mode2d,
+          settings: parsed.success ? parsed.data : current.settings,
+        };
+      },
+      partialize: (s) => ({
+        settings: s.settings,
+        mode2d: s.mode2d,
+        demoAISlots: s.demoAISlots,
+      }),
     },
   ),
 );
