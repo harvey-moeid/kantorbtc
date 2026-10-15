@@ -1,6 +1,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   OrbitControls,
+  Html,
   ContactShadows,
   PerspectiveCamera,
   RoundedBox,
@@ -17,7 +18,7 @@ import {
   type ReactNode,
 } from "react";
 import * as THREE from "three";
-import { staff } from "../../../../packages/shared/src/domain";
+import { staff, staffName } from "../../../../packages/shared/src/domain";
 import { useStore } from "../store";
 import {
   homes,
@@ -330,12 +331,17 @@ function Person({
     leg = useRef<THREE.Group>(null),
     rightLeg = useRef<THREE.Group>(null),
     publicView = useStore((s) => s.publicView),
+    settings = useStore((s) => s.settings),
+    speaking = useStore((s) => s.speakingStaff === person.id),
+    meetings = useStore((s) => s.meetings),
+    [activityLabel, setActivityLabel] = useState("work"),
     selected = useStore((s) => s.selectedStaff === person.id),
     floor = useStore((s) => s.floor);
   const position = useRef(new THREE.Vector3(...homes[index])),
     destination = useRef(new THREE.Vector3()),
     idleClock = useRef(0),
-    lastRoutine = useRef(-1),
+    gait = useRef(index * 0.7),
+    previousPosition = useRef(new THREE.Vector3(...homes[index])),
     routine = useRef(idleRoutine(index, 0));
   const joints = useMemo(
     () => [arm, rightArm, leftElbow, rightElbow, leg, rightLeg],
@@ -357,12 +363,15 @@ function Person({
     joints.forEach((joint, i) => {
       previousPose.current[i] = joint.current?.rotation.x || 0;
     });
-    if (!frame && travelProgress.current === 0)
+    if (!reduced && (!frame || frame.complete) && travelProgress.current === 0)
       idleClock.current += Math.min(dt, 0.25);
-    if (Math.floor(idleClock.current * 2) !== lastRoutine.current) {
-      lastRoutine.current = Math.floor(idleClock.current * 2);
-      routine.current = idleRoutine(index, idleClock.current);
-    }
+    routine.current = idleRoutine(index, idleClock.current);
+    const currentActivity = participating
+      ? "meeting"
+      : routine.current.moving
+        ? "walking"
+        : routine.current.activity;
+    if (currentActivity !== activityLabel) setActivityLabel(currentActivity);
     const desiredProgress = participating ? progress : 0;
     // Track normal playback (including 4x); smooth larger seek/stop jumps.
     const step = Math.min(dt, 0.25) * 4;
@@ -374,28 +383,43 @@ function Person({
     const travelling = participating || travelProgress.current > 0;
     const target = travelling
       ? meetingPosition(index, travelProgress.current)
-      : frame || reduced
+      : (frame && !frame.complete) || reduced
         ? homes[index]
         : routine.current.position;
     destination.current.set(...target);
-    const previousPosition = position.current.clone();
-    if (travelling) position.current.copy(destination.current);
-    else position.current.lerp(destination.current, Math.min(1, dt * 5));
+    previousPosition.current.copy(position.current);
+    position.current.lerp(
+      destination.current,
+      reduced ? 1 : 1 - Math.exp(-12 * dt),
+    );
     ref.current.position.copy(position.current);
     const walking =
       !reduced &&
-      position.current.distanceToSquared(previousPosition) > 0.000001;
+      position.current.distanceToSquared(previousPosition.current) > 0.000001;
     const seated = participating && travelProgress.current >= 0.999;
-    ref.current.position.y +=
-      Math.sin(t * (walking ? 8 : 1.7) + index) *
-      (reduced ? 0 : walking ? 0.045 : 0.012);
-    const phase = t * 6.5 + index * 0.7;
+    const distance = position.current.distanceTo(previousPosition.current);
+    // Drive steps from distance travelled, so feet keep pace at every playback speed.
+    if (walking) gait.current += (distance * Math.PI * 2) / 0.95;
+    const phase = gait.current;
+    ref.current.position.y += walking
+      ? Math.pow(Math.sin(phase), 2) * 0.018
+      : 0;
     const activity = routine.current.activity;
     const speaking = seated && frame?.speaker === index;
     const working = !travelling && activity === "work" && !walking;
     const sitting = seated || (working && index < 11);
+    // Short, offset breaks in typing: stretch shoulders and glance away from the screen.
+    const breakTime = (t + index * 4.7) % 31;
+    const stretching = working && breakTime > 23 && breakTime < 27 && !reduced;
+    const stretch = stretching ? Math.sin(((breakTime - 23) / 4) * Math.PI) : 0;
     if (body.current) {
-      const poseY = seated ? -0.15 : sitting ? -0.2 : 0;
+      const poseY = seated
+        ? -0.15
+        : sitting
+          ? -0.2
+          : reduced
+            ? 0
+            : Math.sin(t * 1.7 + index) * 0.004;
       body.current.position.y = THREE.MathUtils.damp(
         body.current.position.y,
         poseY,
@@ -420,7 +444,7 @@ function Person({
         ? Math.sin(t * 0.9) * 0.22
         : Math.sin(t * 0.55 + index) * 0.12;
       head.current.rotation.x = working
-        ? 0.12 + Math.sin(t * 1.5 + index) * 0.035
+        ? 0.12 - stretch * 0.2 + Math.sin(t * 1.5 + index) * 0.035
         : Math.sin(t * 1.1 + index) * 0.035;
     }
     if (arm.current) {
@@ -431,7 +455,7 @@ function Person({
             ? -0.2
             : 0
         : walking
-          ? Math.sin(phase) * 0.6
+          ? Math.sin(phase) * 0.32
           : speaking
             ? -0.8 + Math.sin(t * 2.8) * 0.22
             : working
@@ -450,7 +474,7 @@ function Person({
             ? -0.2
             : 0
         : walking
-          ? -Math.sin(phase) * 0.6
+          ? -Math.sin(phase) * 0.32
           : activity === "phone"
             ? -1.8
             : working
@@ -485,13 +509,13 @@ function Person({
       leg.current.rotation.x = sitting
         ? -1.0
         : walking
-          ? -Math.sin(phase) * 0.55
+          ? -Math.sin(phase) * 0.48
           : 0;
     if (rightLeg.current)
       rightLeg.current.rotation.x = sitting
         ? -1.0
         : walking
-          ? Math.sin(phase) * 0.55
+          ? Math.sin(phase) * 0.48
           : 0;
     for (const [limb, sign] of [
       [leg, -1],
@@ -499,11 +523,21 @@ function Person({
     ] as const) {
       const knee = limb.current?.children[1];
       if (knee)
-        knee.rotation.x = sitting
-          ? 1.0
-          : walking
-            ? Math.max(0, Math.sin(phase) * sign) * 0.75
-            : 0;
+        knee.rotation.x = THREE.MathUtils.damp(
+          knee.rotation.x,
+          sitting
+            ? 1.0
+            : walking
+              ? Math.max(0, Math.sin(phase) * sign) * 0.85
+              : 0,
+          reduced ? 100 : 14,
+          dt,
+        );
+    }
+    if (stretch > 0) {
+      if (arm.current) arm.current.rotation.x -= stretch * 1.5;
+      if (rightArm.current) rightArm.current.rotation.x -= stretch * 1.5;
+      if (body.current) body.current.rotation.x -= stretch * 0.1;
     }
     if (!reduced)
       joints.forEach((joint, i) => {
@@ -539,11 +573,11 @@ function Person({
               : Math.PI / 2;
     else if (
       walking &&
-      position.current.distanceToSquared(previousPosition) > 0.000001
+      position.current.distanceToSquared(previousPosition.current) > 0.000001
     ) {
       const facing = Math.atan2(
-        position.current.x - previousPosition.x,
-        position.current.z - previousPosition.z,
+        position.current.x - previousPosition.current.x,
+        position.current.z - previousPosition.current.z,
       );
       ref.current.rotation.y +=
         Math.atan2(
@@ -561,17 +595,17 @@ function Person({
       position={homes[index]}
       onClick={(e) => {
         e.stopPropagation();
-        if (!publicView) useStore.getState().set({ selectedStaff: person.id });
+        useStore.getState().set({ speakingStaff: speaking ? null : person.id });
       }}
       onPointerOver={() => {
-        if (!publicView) document.body.style.cursor = "pointer";
+        document.body.style.cursor = "pointer";
       }}
       onPointerOut={() => {
         document.body.style.cursor = "auto";
       }}
     >
       <group ref={body} position={[0, bodyOffset, 0]}>
-        <group ref={head} position={[0, 1.34, 0]}>
+        <group ref={head} position={[0, 1.36, 0]} scale={0.84}>
           <CharacterHead
             index={index}
             reduced={reduced}
@@ -703,19 +737,86 @@ function Person({
         ))}
       </group>
       <SoftShadow scale={[0.65, 0.65]} opacity={0.48} />
-      {selected && (
+      {(selected || speaking) && (
         <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
           <ringGeometry args={[0.29, 0.33, 32]} />
           <meshBasicMaterial color="#b8dfcc" transparent opacity={0.8} />
         </mesh>
       )}
-      {(selected || frame?.speaker === index) && (
+      {speaking && (
+        <Html
+          position={[0, 1.95, 0]}
+          center
+          distanceFactor={13}
+          zIndexRange={[30, 20]}
+        >
+          <div
+            className="avatar-speech"
+            role="status"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              className="speech-close"
+              aria-label="Tutup percakapan"
+              onClick={() => useStore.getState().set({ speakingStaff: null })}
+            >
+              ×
+            </button>
+            <strong>{staffName(person, settings)}</strong>
+            <small>
+              {person.role} ·{" "}
+              {
+                (
+                  {
+                    work: "Bekerja",
+                    coffee: "Istirahat kopi",
+                    musolla: "Waktu tenang",
+                    phone: "Telepon",
+                    walking: "Berjalan",
+                    meeting: "Rapat",
+                  } as Record<string, string>
+                )[activityLabel]
+              }
+            </small>
+            <p>
+              {frame?.speaker === index
+                ? frame.shortMessage
+                : person.kind === "scanner"
+                  ? (!publicView
+                      ? meetings[0]?.scanner[index]?.evidence[0]
+                      : undefined) ||
+                    "Saya sedang memantau candle yang sudah close untuk mencari setup berikutnya."
+                  : person.kind === "ai"
+                    ? (!publicView
+                        ? meetings[0]?.votes[index - 4]?.reason
+                        : undefined) ||
+                      "Saya siap menilai bukti scanner pada rapat berikutnya."
+                    : person.kind === "rr"
+                      ? "Saya memeriksa level risiko dan target sebelum sinyal disetujui."
+                      : person.kind === "boss"
+                        ? "Saya menunggu kesepakatan tim dan validasi risiko."
+                        : "Saya memastikan aktivitas kantor berjalan lancar."}
+            </p>
+            {!publicView && (
+              <button
+                className="text-button"
+                onClick={() =>
+                  useStore.getState().set({ selectedStaff: person.id })
+                }
+              >
+                Lihat profil & analisis →
+              </button>
+            )}
+          </div>
+        </Html>
+      )}
+      {!speaking && (selected || frame?.speaker === index) && (
         <LabelSprite
           at={[0, 1.92, 0]}
           text={
             frame?.speaker === index
               ? frame.shortMessage
-              : `${person.name} / ${person.role}`
+              : `${staffName(person, settings)} / ${person.role}`
           }
           light
         />
@@ -782,13 +883,13 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
     <>
       <group visible={downstairs}>
         <Box
-          at={[1.5, -0.15, 0]}
-          size={[15.3, 0.3, 8.4]}
+          at={[1.5, -0.15, 0.8]}
+          size={[15.3, 0.3, 10]}
           color="#ffffff"
           surface="oak"
           roughness={0.72}
         />
-        <Box at={[1.5, -0.34, 0]} size={[15.5, 0.09, 8.6]} color="#666d5f" />
+        <Box at={[1.5, -0.34, 0.8]} size={[15.5, 0.09, 10.2]} color="#666d5f" />
         <Box at={[-6, 1.5, 0]} size={[0.12, 3, 8.2]} color="#d5d0be" />
         <Box at={[0, 1.5, -4.06]} size={[12, 3, 0.13]} color="#213c40" />
         {[-4.7, -2.35, 0, 2.35, 4.7].map((x) => (
@@ -849,6 +950,39 @@ function Architecture({ onChart }: { onChart: (s: string) => void }) {
           position={[-0.85, 2.4, -3.8]}
           onClick={() => onChart("xauusd")}
         />
+        <Box
+          at={[1.5, 0.015, 4.9]}
+          size={[14.8, 0.025, 1.55]}
+          color="#b8c6b4"
+          surface="stone"
+        />
+        {[-4.8, -1.7, 1.4, 4.5, 7.6].map((x) => (
+          <group key={`terrace-${x}`}>
+            <Box
+              at={[x, 0.32, 5.48]}
+              size={[1.65, 0.64, 0.4]}
+              color="#d2c8b6"
+            />
+            <Plant x={x} z={5.48} y={0.48} />
+          </group>
+        ))}
+        <RoundedBox
+          position={[0, 0.42, 4.95]}
+          args={[2.8, 0.14, 0.55]}
+          radius={0.06}
+          smoothness={3}
+          castShadow
+        >
+          <SurfaceMaterial surface="oak" roughness={0.7} />
+        </RoundedBox>
+        {[-1.05, 1.05].map((x) => (
+          <Box
+            key={`bench-${x}`}
+            at={[x, 0.2, 4.95]}
+            size={[0.08, 0.4, 0.45]}
+            color="#34473e"
+          />
+        ))}
         <Plant x={-5.6} z={3.55} />
         <Plant x={6.7} z={-3.4} />
         <Plant x={-5.5} z={-3.4} />
@@ -1126,6 +1260,7 @@ export default function OfficeScene({
           powerPreference: "high-performance",
         }}
         fallback={fallback}
+        onPointerMissed={() => useStore.getState().set({ speakingStaff: null })}
         onCreated={({ gl }) => {
           gl.setClearColor("#1b211c", 0);
           gl.domElement.addEventListener("webglcontextlost", fallback2d, {
@@ -1150,11 +1285,11 @@ export default function OfficeScene({
           onStats={(stats) => onStats({ ...stats, onDemand: reduced })}
           onFallback={fallback2d}
         />
-        <ambientLight intensity={0.28} />
-        <hemisphereLight args={["#d7e9ef", "#202b30", 0.65]} />
+        <ambientLight intensity={0.45} />
+        <hemisphereLight args={["#d7e9ef", "#535e50", 0.85]} />
         <directionalLight
           position={[-3, 11, 7]}
-          intensity={3.5}
+          intensity={2.7}
           color="#ffe1b3"
           castShadow={quality !== "low"}
           shadow-mapSize={high ? [2048, 2048] : [1024, 1024]}

@@ -1,3 +1,4 @@
+import { staffName } from "../../../../packages/shared/src/domain";
 import {
   Pause,
   Play,
@@ -23,6 +24,7 @@ export default function MeetingPlayback({
   onFollow: (follow: boolean) => void;
 }) {
   const language = useStore((s) => s.settings.language),
+    settings = useStore((s) => s.settings),
     publicView = useStore((s) => s.publicView),
     demo = useStore((s) => s.demo),
     en = language === "en",
@@ -84,13 +86,13 @@ export default function MeetingPlayback({
             className="avatar"
             style={{ "--avatar-color": speaker.color } as React.CSSProperties}
           >
-            {speaker.name[0]}
+            {staffName(speaker, settings)[0]}
           </span>
         )}
         <div>
           {speaker && (
             <b>
-              {speaker.name} ·{" "}
+              {staffName(speaker, settings)} ·{" "}
               {speaker.kind === "ai" && !publicView
                 ? playback.event?.details?.votes[(frame?.speaker || 4) - 4]
                     ?.provider || speaker.role

@@ -1,5 +1,6 @@
 import {
   defaultSettings,
+  settingsSchema,
   type Settings,
 } from "../../../packages/shared/src/domain";
 import type { Env, Slot } from "./env";
@@ -12,7 +13,10 @@ export async function settings(
     "SELECT value_json,version FROM settings WHERE id='scanner'",
   ).first<{ value_json: string; version: number }>();
   return row
-    ? { settings: JSON.parse(row.value_json), version: row.version }
+    ? {
+        settings: settingsSchema.parse(JSON.parse(row.value_json)),
+        version: row.version,
+      }
     : { settings: structuredClone(defaultSettings), version: 1 };
 }
 export async function slots(env: Env): Promise<Slot[]> {

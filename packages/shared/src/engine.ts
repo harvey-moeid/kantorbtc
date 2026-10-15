@@ -88,6 +88,7 @@ export function scan(
         evidence: ["Historis belum cukup."],
       }),
     );
+  const strategy = settings.strategy ?? defaultSettings.strategy;
   const last = candles.at(-1)!,
     close = candles.map((c) => c.close),
     fast = ema(close, settings.emaFast).at(-1)!,
@@ -98,20 +99,27 @@ export function scan(
     swingHigh = Math.max(...prev.map((c) => c.high)),
     swingLow = Math.min(...prev.map((c) => c.low));
   const smc: Direction =
-    last.close > swingHigh
+    strategy.smcMode !== "sweep" && last.close > swingHigh
       ? "long"
-      : last.close < swingLow
+      : strategy.smcMode !== "sweep" && last.close < swingLow
         ? "short"
-        : last.low < swingLow && last.close > swingLow
+        : strategy.smcMode !== "breakout" &&
+            last.low < swingLow &&
+            last.close > swingLow
           ? "long"
-          : last.high > swingHigh && last.close < swingHigh
+          : strategy.smcMode !== "breakout" &&
+              last.high > swingHigh &&
+              last.close < swingHigh
             ? "short"
             : "netral";
   const momentum = macd(close).histogram.at(-1)!;
   const indicator: Direction =
-    fast > slow && strength > 50 && strength < 75 && momentum > 0
+    fast > slow && strength > 50 && strength < strategy.rsiUpper && momentum > 0
       ? "long"
-      : fast < slow && strength < 50 && strength > 25 && momentum < 0
+      : fast < slow &&
+          strength < 50 &&
+          strength > strategy.rsiLower &&
+          momentum < 0
         ? "short"
         : "netral";
   const averageVolume = prev.reduce((a, c) => a + c.volume, 0) / prev.length,
@@ -148,7 +156,7 @@ export function scan(
       direction:
         averageVolume === 0
           ? "abstain"
-          : ratio > 1.15
+          : ratio > strategy.volumeRatio
             ? last.close > last.open
               ? "long"
               : "short"
@@ -164,7 +172,7 @@ export function scan(
       group: "derivatives",
       direction: !derivatives
         ? "abstain"
-        : derivatives.oiChange > 0.01
+        : derivatives.oiChange > strategy.oiChange
           ? derivatives.funding < 0
             ? "long"
             : "short"

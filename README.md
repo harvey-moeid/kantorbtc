@@ -116,3 +116,13 @@ Belum dilakukan deployment dari sesi implementasi. Untuk produksi:
 5. Uji koneksi baca provider di UI, histori/pagination, stream/failover, quorum/timeout, outbox, dan performa di perangkat target. Cloudflare Workers websocket port dan endpoint provider perlu diuji pada akun deployment.
 
 Subdomain `muidsoft.com` dapat dipasang setelah pemilik menentukan nama dan memberikan akses DNS. Deployment aplikasi dan perubahan DNS dilakukan terpisah dari penyimpanan kode di GitHub.
+
+### Personalisasi kantor dan strategi
+
+- **Pengaturan → Umum & tampilan → Nama karakter**: ubah nama setiap anggota tim, lalu simpan. Nama yang sama tampil di daftar tim, profil, speech bubble, dan presentasi rapat.
+- Klik karakter di kantor 3D untuk membuka speech bubble berisi aktivitas dan hasil analisis yang tersedia. Tombol di dalam bubble membuka profil lengkap; klik area kosong atau tombol × untuk menutupnya.
+- **Pengaturan → Scanner & risiko → Strategi scanner**: pilih breakout/sweep SMC, batas RSI, rasio volume, dan minimum perubahan open interest. Parameter ini dipakai mesin scanner pada candle close berikutnya setelah disimpan, bersama EMA, swing, ambang skor, RR, dan TTL.
+- **Pengaturan → Susunan AI**: pilih provider dan model pada masing-masing slot, atau isi ID model kustom, lalu tekan **Simpan susunan AI**. Daftar model merupakan saran; akses model mengikuti akun provider. Mode demo menyimpan pilihan di perangkat tanpa menjalankan provider live.
+- Avatar mengikuti jalur melengkung melalui lorong, memiliki jalur kembali terpisah di koridor utama, serta animasi langkah berdasarkan jarak tempuh. Aktivitas meliputi bekerja, jeda mengetik/peregangan, istirahat kopi, ruang tenang, dan rapat. Area lantai bawah diperluas dengan promenade dan tempat duduk.
+
+Pengaturan lama mendapat nilai default untuk kolom baru secara otomatis. Dalam mode live, nama dan strategi tersimpan di backend; dalam demo, pengaturan tersimpan di perangkat. Jalankan `python tests/office_features_smoke.py` dengan server Vite aktif untuk menguji interaksi baru melalui Chromium.

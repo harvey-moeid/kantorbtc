@@ -105,4 +105,31 @@ describe("office paths and capacity", () => {
       for (let i = 8; i <= 10; i++)
         expect(idleRoutine(i, t).position[1]).toBe(3.1);
   });
+  it("keeps idle walks out of workstation desk footprints", () => {
+    for (let t = 0; t < 900; t += 0.2) {
+      for (let i = 0; i < homes.length; i++) {
+        const routine = idleRoutine(i, t);
+        if (!routine.moving) continue;
+        const [x, y, z] = routine.position;
+        if (y !== 0) continue;
+        for (const [deskX, , deskZ] of homes.slice(0, 8)) {
+          expect(
+            Math.abs(x - deskX) < 0.85 && Math.abs(z - (deskZ - 0.72)) < 0.48,
+          ).toBe(false);
+        }
+      }
+    }
+  });
+  it("moves continuously across activity and routine-cycle changes", () => {
+    for (let i = 0; i < homes.length; i++) {
+      let previous = idleRoutine(i, 0).position;
+      for (let t = 0.1; t < 190; t += 0.1) {
+        const next = idleRoutine(i, t).position;
+        expect(
+          Math.hypot(...next.map((n, axis) => n - previous[axis])),
+        ).toBeLessThan(0.09);
+        previous = next;
+      }
+    }
+  });
 });
