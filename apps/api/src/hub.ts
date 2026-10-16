@@ -31,7 +31,8 @@ export class MarketHub {
   private feed: BtcFeed;
   private tickQueue: Promise<void> = Promise.resolve();
   private previousBtc: Quote | null = null;
-  private lastPersist = 0;
+  private quotes = new Map<Quote["symbol"], Quote>();
+  private quoteWriteAttempts = new Map<Quote["symbol"], number>();
   constructor(
     private state: DurableObjectState,
     private env: Env,
@@ -41,10 +42,8 @@ export class MarketHub {
         .then(async () => {
           const previous = this.previousBtc;
           this.previousBtc = quote;
-          if (Date.now() - this.lastPersist >= 1000) {
-            this.lastPersist = Date.now();
-            await this.persistQuote(quote);
-          }
+          this.quotes.set(quote.symbol, quote);
+          await this.persistQuote(quote);
           await this.trackSignals(quote, previous);
           await this.broadcast(
             {
@@ -65,14 +64,45 @@ export class MarketHub {
     });
   }
   private async persistQuote(quote: Quote) {
-    await this.env.DB.prepare(
-      "INSERT INTO quotes(symbol,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(symbol) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at",
-    )
-      .bind(quote.symbol, JSON.stringify(quote), Date.now())
-      .run();
+    const now = Date.now();
+    const previous = this.quoteWriteAttempts.get(quote.symbol);
+    if (previous !== undefined && now - previous < 300000) return;
+    // Reserve before awaiting: feed ticks and REST fallback share one budget.
+    // Keep the reservation on failure to avoid hammering an exhausted D1 quota.
+    this.quoteWriteAttempts.set(quote.symbol, now);
+    try {
+      await this.env.DB.prepare(
+        "INSERT INTO quotes(symbol,value_json,updated_at) VALUES(?,?,?) ON CONFLICT(symbol) DO UPDATE SET value_json=excluded.value_json,updated_at=excluded.updated_at WHERE quotes.updated_at<=excluded.updated_at-300000",
+      )
+        .bind(quote.symbol, JSON.stringify(quote), now)
+        .run();
+    } catch (error) {
+      console.error("Quote snapshot failed", { symbol: quote.symbol, error });
+    }
   }
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/quotes") {
+      if (this.quotes.size < symbols.length) {
+        const { results } = await this.env.DB.prepare(
+          "SELECT value_json FROM quotes",
+        ).all<{ value_json: string }>();
+        for (const row of results) {
+          const quote = JSON.parse(row.value_json) as Quote;
+          if (!this.quotes.has(quote.symbol))
+            this.quotes.set(quote.symbol, quote);
+        }
+      }
+      return Response.json({
+        quotes: [...this.quotes.values()].map((quote) => ({
+          ...quote,
+          status:
+            Date.now() - quote.at > 45000 && quote.status !== "closed"
+              ? "stale"
+              : quote.status,
+        })),
+      });
+    }
     if (url.pathname === "/ws") {
       if (this.state.getWebSockets().length >= 128)
         return new Response("Connection limit", { status: 429 });
@@ -170,15 +200,17 @@ export class MarketHub {
       for (const symbol of symbols) {
         if (symbol === "BTCUSDT" && this.feed.latest) continue;
         try {
-          const previous = await this.env.DB.prepare(
+          let old = this.quotes.get(symbol) || null;
+          if (!old) {
+            const row = await this.env.DB.prepare(
               "SELECT value_json FROM quotes WHERE symbol=?",
             )
               .bind(symbol)
-              .first<{ value_json: string }>(),
-            old: Quote | null = previous
-              ? JSON.parse(previous.value_json)
-              : null,
-            quote = await marketQuote(this.env, symbol);
+              .first<{ value_json: string }>();
+            old = row ? (JSON.parse(row.value_json) as Quote) : null;
+          }
+          const quote = await marketQuote(this.env, symbol);
+          this.quotes.set(symbol, quote);
           if (old && old.source !== quote.source)
             await this.env.DB.prepare(
               "INSERT INTO source_events(id,symbol,from_source,to_source,reason,at) VALUES(?,?,?,?,?,?)",
@@ -209,19 +241,11 @@ export class MarketHub {
           if (quote.status !== "closed" && Date.now() - quote.at < 45000)
             await this.trackSignals(quote, old);
         } catch {
-          const row = await this.env.DB.prepare(
-            "SELECT value_json FROM quotes WHERE symbol=?",
-          )
-            .bind(symbol)
-            .first<{ value_json: string }>();
-          if (row) {
-            const quote = JSON.parse(row.value_json) as Quote;
-            quote.status = "stale";
-            await this.env.DB.prepare(
-              "UPDATE quotes SET value_json=? WHERE symbol=?",
-            )
-              .bind(JSON.stringify(quote), symbol)
-              .run();
+          const quote = this.quotes.get(symbol);
+          if (quote && quote.status !== "closed") {
+            const stale: Quote = { ...quote, status: "stale" };
+            this.quotes.set(symbol, stale);
+            await this.persistQuote(stale);
           }
         }
       }

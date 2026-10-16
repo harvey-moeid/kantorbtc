@@ -8,7 +8,6 @@ import {
   timeframes,
   type Candle,
   type Meeting,
-  type Quote,
   type Signal,
 } from "../../../packages/shared/src/domain";
 import { encrypt, hashToken, verifyPassword } from "./security";
@@ -174,17 +173,8 @@ app.get("/api/stream", (c) => {
   );
 });
 app.get("/api/market", async (c) => {
-  const { results } = await c.env.DB.prepare(
-    "SELECT value_json FROM quotes",
-  ).all<{ value_json: string }>();
-  const quotes = results
-    .map((r) => JSON.parse(r.value_json) as Quote)
-    .map((q) => ({
-      ...q,
-      status:
-        Date.now() - q.at > 45000 && q.status !== "closed" ? "stale" : q.status,
-    }));
-  return c.json({ quotes });
+  const hub = c.env.MARKET_HUB.get(c.env.MARKET_HUB.idFromName("office"));
+  return hub.fetch("https://hub/quotes");
 });
 app.get("/api/market/:symbol/candles", async (c) => {
   const parsed = z
