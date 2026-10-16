@@ -126,3 +126,10 @@ Subdomain `muidsoft.com` dapat dipasang setelah pemilik menentukan nama dan memb
 - Avatar mengikuti jalur melengkung melalui lorong, memiliki jalur kembali terpisah di koridor utama, serta animasi langkah berdasarkan jarak tempuh. Aktivitas meliputi bekerja, jeda mengetik/peregangan, istirahat kopi, ruang tenang, dan rapat. Area lantai bawah diperluas dengan promenade dan tempat duduk.
 
 Pengaturan lama mendapat nilai default untuk kolom baru secara otomatis. Dalam mode live, nama dan strategi tersimpan di backend; dalam demo, pengaturan tersimpan di perangkat. Jalankan `python tests/office_features_smoke.py` dengan server Vite aktif untuk menguji interaksi baru melalui Chromium.
+
+### Anggaran tulis D1 untuk data pasar
+
+- Harga realtime tetap diproses lewat WebSocket untuk tampilan, sinyal, dan alert. Snapshot tabel `quotes` dibatasi satu penulisan setiap 5 menit per aset; endpoint `/api/market` mengambil harga terbaru dari MarketHub, dengan snapshot D1 sebagai fallback setelah restart. Snapshot berumur lebih dari 45 detik tetap ditandai stale, kecuali pasar closed.
+- Candle tertutup (timeframe minimum 5m) hanya ditulis jika baru atau OHLCV/sumber berubah. Batch yang seluruhnya identik tidak mengirim UPSERT. SQL juga menolak update identik saat ada penulis bersamaan.
+- Backfill historis dibatasi secara global menjadi satu halaman (maksimum 300 candle) setiap 15 menit. Penanda interval berada di D1 agar batas tetap berlaku setelah restart. Pengisian histori satu tahun menjadi lebih lambat; histori terus dilanjutkan dari cursor yang tersimpan.
+- Batas teoritis snapshot dua aset turun dari sekitar 92.160 menjadi 576 penulisan/hari; backfill dari sekitar 1.728.000 menjadi 28.800 candle/hari. Angka ini bukan total billing D1: indeks, meeting, sinyal, alert, dan query baca tetap dihitung tersendiri. Penghematan berlaku setelah versi ini di-deploy, dan tidak mengembalikan kuota yang sudah digunakan.

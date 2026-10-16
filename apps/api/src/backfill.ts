@@ -47,6 +47,15 @@ export async function initialBackfill(env: Env) {
     .run();
 }
 export async function backfillChunk(env: Env) {
+  // One global historical page per 15 minutes, persisted across hub restarts.
+  // Take the slot atomically before provider I/O, including failed attempts.
+  const now = Date.now();
+  const slot = await env.DB.prepare(
+    "INSERT INTO settings(id,value_json,version,updated_at) SELECT 'backfill_last_attempt','true',1,? WHERE EXISTS(SELECT 1 FROM backfill_jobs WHERE status='pending') ON CONFLICT(id) DO UPDATE SET updated_at=excluded.updated_at WHERE settings.updated_at<=excluded.updated_at-900000 RETURNING id",
+  )
+    .bind(now)
+    .first<{ id: string }>();
+  if (!slot) return;
   const job = await env.DB.prepare(
     "SELECT * FROM backfill_jobs WHERE status='pending' ORDER BY updated_at LIMIT 1",
   ).first<BackfillJob>();

@@ -331,13 +331,39 @@ export async function persistCandles(
   tf: Timeframe,
   data: { candles: Candle[]; source: string },
 ) {
-  for (let i = 0; i < data.candles.length; i += 50)
+  // Read only the incoming keys, using the existing composite primary key.
+  // No in-memory cache: retries and separate Worker instances see persisted data.
+  const incoming = [...new Map(data.candles.map((c) => [c.time, c])).values()];
+  const changed: Candle[] = [];
+  for (let i = 0; i < incoming.length; i += 50) {
+    const chunk = incoming.slice(i, i + 50);
+    const { results } = await env.DB.prepare(
+      `SELECT time,open,high,low,close,volume,source FROM candles WHERE symbol=? AND tf=? AND time IN (${chunk.map(() => "?").join(",")})`,
+    )
+      .bind(symbol, tf, ...chunk.map((c) => c.time))
+      .all<Candle & { source: string }>();
+    const existing = new Map(results.map((c) => [c.time, c]));
+    for (const c of chunk) {
+      const old = existing.get(c.time);
+      if (
+        !old ||
+        old.open !== c.open ||
+        old.high !== c.high ||
+        old.low !== c.low ||
+        old.close !== c.close ||
+        old.volume !== c.volume ||
+        old.source !== data.source
+      )
+        changed.push(c);
+    }
+  }
+  for (let i = 0; i < changed.length; i += 50)
     await env.DB.batch(
-      data.candles
+      changed
         .slice(i, i + 50)
         .map((c) =>
           env.DB.prepare(
-            "INSERT INTO candles(symbol,tf,time,open,high,low,close,volume,source) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,tf,time) DO UPDATE SET open=excluded.open,high=excluded.high,low=excluded.low,close=excluded.close,volume=excluded.volume,source=excluded.source",
+            "INSERT INTO candles(symbol,tf,time,open,high,low,close,volume,source) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(symbol,tf,time) DO UPDATE SET open=excluded.open,high=excluded.high,low=excluded.low,close=excluded.close,volume=excluded.volume,source=excluded.source WHERE candles.open IS NOT excluded.open OR candles.high IS NOT excluded.high OR candles.low IS NOT excluded.low OR candles.close IS NOT excluded.close OR candles.volume IS NOT excluded.volume OR candles.source IS NOT excluded.source",
           ).bind(
             symbol,
             tf,
