@@ -43,7 +43,9 @@ export async function initialBackfill(env: Env) {
     if (!(await isBackfillEnabled(env, symbol))) continue;
     const existing = await env.DB.prepare(
       "SELECT id FROM backfill_jobs WHERE symbol=? LIMIT 1",
-    ).bind(symbol).first();
+    )
+      .bind(symbol)
+      .first();
     if (!existing) await createBackfill(env, symbol, now - 31536000, now);
   }
   await env.DB.prepare(
