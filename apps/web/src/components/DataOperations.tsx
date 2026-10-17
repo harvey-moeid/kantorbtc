@@ -86,9 +86,11 @@ export default function DataOperations() {
       setEnabled(result.enabled);
       const data = await api<{ jobs: Job[] }>("/backfill");
       setJobs(data.jobs);
-      useStore.getState().notify(
-        `Backfill ${asset} ${result.enabled[asset] ? "diaktifkan" : "dijeda"}; histori yang sudah tersimpan tetap aman.`,
-      );
+      useStore
+        .getState()
+        .notify(
+          `Backfill ${asset} ${result.enabled[asset] ? "diaktifkan" : "dijeda"}; histori yang sudah tersimpan tetap aman.`,
+        );
     } catch (e) {
       useStore.getState().notify((e as Error).message);
     } finally {
@@ -106,9 +108,9 @@ export default function DataOperations() {
       </div>
       <div className="callout">
         BTCUSDT aktif secara default, XAUUSD nonaktif hingga provider siap.
-        Perubahan berlaku per symbol untuk seluruh timeframe. Job pending
-        dijeda saat OFF, tanpa kehilangan cursor; job gagal dapat dilanjutkan
-        saat ON. Setiap potongan maksimal 300 candle dan satu potongan per 15 menit.
+        Perubahan berlaku per symbol untuk seluruh timeframe. Job pending dijeda
+        saat OFF, tanpa kehilangan cursor; job gagal dapat dilanjutkan saat ON.
+        Setiap potongan maksimal 300 candle dan satu potongan per 15 menit.
       </div>
       {symbols.map((asset) => (
         <label className="settings-row" key={asset}>
@@ -189,10 +191,10 @@ export default function DataOperations() {
                       j.status === "pending" && !enabled[j.symbol as Symbol]
                         ? ""
                         : j.status === "complete"
-                        ? "green"
-                        : j.status === "failed"
-                          ? "red"
-                          : ""
+                          ? "green"
+                          : j.status === "failed"
+                            ? "red"
+                            : ""
                     }
                   >
                     {j.status === "pending" && !enabled[j.symbol as Symbol]
