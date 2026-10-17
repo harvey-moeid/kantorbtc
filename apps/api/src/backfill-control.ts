@@ -28,9 +28,7 @@ export async function isBackfillEnabled(
   env: Env,
   symbol: Symbol,
 ): Promise<boolean> {
-  const row = await env.DB.prepare(
-    "SELECT value_json FROM settings WHERE id=?",
-  )
+  const row = await env.DB.prepare("SELECT value_json FROM settings WHERE id=?")
     .bind(settingKey(symbol))
     .first<{ value_json: string }>();
   return row ? row.value_json === "true" : defaultBackfillFlags[symbol];
