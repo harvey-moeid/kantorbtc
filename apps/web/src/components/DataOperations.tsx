@@ -19,6 +19,12 @@ interface Job {
 export default function DataOperations() {
   const demo = useStore((s) => s.demo),
     [jobs, setJobs] = useState<Job[]>([]),
+    [enabled, setEnabled] = useState<Record<Symbol, boolean>>({
+      BTCUSDT: false,
+      XAUUSD: false,
+    }),
+    [loaded, setLoaded] = useState(false),
+    [savingSymbol, setSavingSymbol] = useState<Symbol | null>(null),
     [symbol, setSymbol] = useState<Symbol>("BTCUSDT"),
     [from, setFrom] = useState("2025-10-11"),
     [to, setTo] = useState("2026-10-11"),
@@ -27,9 +33,13 @@ export default function DataOperations() {
     if (demo) return;
     let active = true;
     const load = () =>
-      api<{ jobs: Job[] }>("/backfill")
+      api<{ jobs: Job[]; enabled: Record<Symbol, boolean> }>("/backfill")
         .then((d) => {
-          if (active) setJobs(d.jobs);
+          if (active) {
+            setJobs(d.jobs);
+            setEnabled(d.enabled);
+            setLoaded(true);
+          }
         })
         .catch((e) => {
           if (active) useStore.getState().notify(e.message);
@@ -41,10 +51,29 @@ export default function DataOperations() {
       clearInterval(timer);
     };
   }, [demo]);
+  const toggleBackfill = async (target: Symbol, next: boolean) => {
+    setSavingSymbol(target);
+    try {
+      if (demo) throw new Error("Backfill hanya dapat diatur di backend live.");
+      await api(`/backfill/${target}/enabled`, {
+        method: "PUT",
+        body: JSON.stringify({ enabled: next }),
+      });
+      setEnabled((prev) => ({ ...prev, [target]: next }));
+      useStore.getState().notify(
+        `Backfill ${target} ${next ? "ON: job yang tertunda bisa berlanjut." : "OFF: histori berhenti tanpa menghapus candle."}`,
+      );
+    } catch (error) {
+      useStore.getState().notify((error as Error).message);
+    } finally {
+      setSavingSymbol(null);
+    }
+  };
   const start = async () => {
     setBusy(true);
     try {
       if (demo) throw new Error("Backfill hanya berjalan di backend live.");
+      if (!enabled[symbol]) throw new Error(`Backfill ${symbol} masih OFF.`);
       await api("/backfill", {
         method: "POST",
         body: JSON.stringify({
@@ -71,15 +100,34 @@ export default function DataOperations() {
       <div className="settings-title">
         <h2>Histori candle & backfill</h2>
         <p>
-          Pengisian awal satu tahun, lalu upsert tiap 5 menit tanpa menghapus
-          candle lama.
+          Histori candle per simbol dengan kontrol backfill independen. Candle
+          live tetap berjalan saat backfill OFF.
         </p>
       </div>
       <div className="callout">
-        Mode live membuat job awal otomatis untuk dua aset dan lima timeframe.
-        Tiap potongan maksimal 300 candle, satu potongan per alarm. Riwayat
-        penuh bergantung provider dan paket akun; job gagal dapat dilanjutkan
-        dari cursor terakhir.
+        Backfill historis default OFF untuk menghemat kuota D1. Mengaktifkan
+        simbol akan melanjutkan job pending dari cursor terakhir; mematikan
+        simbol menunda histori saja, bukan scanner dan candle live. Pemrosesan
+        maksimal satu potongan historis per 15 menit untuk semua simbol.
+      </div>
+      <h3>Aktifkan backfill per simbol</h3>
+      <div className="backfill-toggles">
+        {symbols.map((target) => (
+          <label className="settings-row" key={target}>
+            <div>
+              <b>{target}</b>
+              <p>{enabled[target] ? "ON · histori diproses bertahap" : "OFF · job histori dijeda"}</p>
+            </div>
+            <input
+              className="toggle"
+              type="checkbox"
+              aria-label={`Backfill histori ${target}`}
+              checked={enabled[target]}
+              disabled={demo || !loaded || savingSymbol !== null}
+              onChange={(e) => void toggleBackfill(target, e.target.checked)}
+            />
+          </label>
+        ))}
       </div>
       <div className="backfill-form">
         <label className="form-field">
@@ -112,7 +160,7 @@ export default function DataOperations() {
       </div>
       <button
         className="button primary"
-        disabled={busy || demo}
+        disabled={busy || demo || !loaded || !enabled[symbol]}
         onClick={start}
       >
         <Play size={15} />
@@ -144,7 +192,7 @@ export default function DataOperations() {
                           : ""
                     }
                   >
-                    {j.status.toUpperCase()}
+                    {j.status === "pending" && !enabled[j.symbol as Symbol] ? "JEDA" : j.status.toUpperCase()}
                   </Badge>
                 </div>
                 <div className="backfill-track">
@@ -158,6 +206,7 @@ export default function DataOperations() {
                 {j.status === "failed" && (
                   <button
                     className="text-button"
+                    disabled={demo || !enabled[j.symbol as Symbol]}
                     onClick={async () => {
                       try {
                         await api(`/backfill/${j.id}/resume`, {
