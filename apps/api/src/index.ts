@@ -17,6 +17,7 @@ import { marketCandles, persistCandles } from "./market";
 import { safeWebhook } from "./notifications";
 import { createBackfill } from "./backfill";
 import { testProvider } from "./provider-test";
+import { applicationHealth, applicationReadiness } from "./health";
 export { MarketHub } from "./hub";
 const app = new Hono<{
   Bindings: Env;
@@ -61,14 +62,10 @@ async function session(
     .bind(await hashToken(token), Date.now())
     .first();
 }
-app.get("/api/health", (c) =>
-  c.json({
-    status: "ok",
-    app: "kantor",
-    mode: c.env.APP_MODE,
-    version: "0.1.0",
-  }),
-);
+app.get("/api/health", async (c) => {
+  const health = await applicationHealth(c.env);
+  return c.json(health, health.status === "ok" ? 200 : 503);
+});
 app.get("/api/auth/session", async (c) =>
   c.json({
     authenticated: !!(await session(c.env, getCookie(c, "kantor_session"))),
@@ -150,6 +147,10 @@ app.use("/api/*", async (c, next) => {
   c.set("sessionHash", found.token_hash);
   c.set("sessionExpiry", found.expires_at);
   await next();
+});
+app.get("/api/readiness", async (c) => {
+  const readiness = await applicationReadiness(c.env);
+  return c.json(readiness, readiness.status === "ok" ? 200 : 503);
 });
 app.post("/api/auth/logout", async (c) => {
   await c.env.DB.prepare("DELETE FROM sessions WHERE token_hash=?")

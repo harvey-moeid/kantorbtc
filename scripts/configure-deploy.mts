@@ -67,6 +67,7 @@ export function deploymentConfig(
     })),
     durable_objects: base.durable_objects,
     migrations: base.migrations,
+    observability: base.observability,
     vars: { ...base.vars, APP_MODE: "live" },
     triggers: base.triggers,
     ...(base.ai ? { ai: base.ai } : {}),

@@ -49,6 +49,8 @@ for attempt in range(60):
         with urllib.request.urlopen('http://127.0.0.1:5173/api/health', timeout=1) as response:
             health = json.load(response)
         if health.get('status') == 'ok' and health.get('mode') == 'demo':
+            if health.get('checks') != {'database': True, 'configuration': True}:
+                raise SystemExit('CI requires a migrated database and valid application configuration.')
             break
         raise SystemExit(f"CI smoke tests require APP_MODE=demo; received status={health.get('status')!r}, mode={health.get('mode')!r}.")
     except (OSError, ValueError):

@@ -21,6 +21,7 @@ import { claimPriceAlert, enqueue, flushOutbox } from "./notifications";
 import { backfillChunk, initialBackfill } from "./backfill";
 import { BtcFeed } from "./btc-feed";
 import { derivatives } from "./derivatives";
+import { marketReadiness } from "./health";
 import {
   publicMeetingEvent,
   type PublicOfficeEvent,
@@ -32,6 +33,7 @@ export class MarketHub {
   private tickQueue: Promise<void> = Promise.resolve();
   private previousBtc: Quote | null = null;
   private quotes = new Map<Quote["symbol"], Quote>();
+  private quoteObservedAt = new Map<Quote["symbol"], number>();
   private quoteWriteAttempts = new Map<Quote["symbol"], number>();
   constructor(
     private state: DurableObjectState,
@@ -43,6 +45,7 @@ export class MarketHub {
           const previous = this.previousBtc;
           this.previousBtc = quote;
           this.quotes.set(quote.symbol, quote);
+          this.quoteObservedAt.set(quote.symbol, Date.now());
           await this.persistQuote(quote);
           await this.trackSignals(quote, previous);
           await this.broadcast(
@@ -82,6 +85,10 @@ export class MarketHub {
   }
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === "/health")
+      return Response.json({
+        markets: marketReadiness(this.quotes, this.quoteObservedAt),
+      });
     if (url.pathname === "/quotes") {
       if (this.quotes.size < symbols.length) {
         const { results } = await this.env.DB.prepare(
@@ -211,6 +218,7 @@ export class MarketHub {
           }
           const quote = await marketQuote(this.env, symbol);
           this.quotes.set(symbol, quote);
+          this.quoteObservedAt.set(symbol, Date.now());
           if (old && old.source !== quote.source)
             await this.env.DB.prepare(
               "INSERT INTO source_events(id,symbol,from_source,to_source,reason,at) VALUES(?,?,?,?,?,?)",
@@ -299,14 +307,15 @@ export class MarketHub {
         Math.max(previous.price, quote.price) >= alert.price &&
         quote.at - (alert.last_sent_at || 0) >= config.settings.cooldown * 1000
       ) {
-        if (!(await claimPriceAlert(this.env, alert.id, alert.price, quote.at)))
-          continue;
-        if (config.settings.discordPrices)
-          await enqueue(
-            this.env,
-            `price-${alert.id}`,
-            `${quote.symbol}: harga melintasi ${alert.price}. Sumber ${quote.source}. Bukan nasihat keuangan.`,
-          );
+        await claimPriceAlert(
+          this.env,
+          alert.id,
+          alert.price,
+          quote.at,
+          config.settings.discordPrices
+            ? `${quote.symbol}: harga melintasi ${alert.price}. Sumber ${quote.source}. Bukan nasihat keuangan.`
+            : undefined,
+        );
       }
   }
   private async expireSignals() {

@@ -133,8 +133,8 @@ jobs:
           node --input-type=module - <<'JS'
           import { readFileSync } from 'node:fs';
           const health = JSON.parse(readFileSync('/tmp/kantor-health.json', 'utf8'));
-          if (health.status !== 'ok' || health.app !== 'kantor' || health.mode !== 'live') {
+          if (health.status !== 'ok' || health.app !== 'kantor' || health.mode !== 'live' || health.checks?.database !== true || health.checks?.configuration !== true) {
             throw new Error('Unexpected deployment health response');
           }
-          console.log('Deployed application is healthy in live mode.');
+          console.log('Live application, core D1 schema and application configuration are healthy. Provider acceptance remains separate.');
           JS

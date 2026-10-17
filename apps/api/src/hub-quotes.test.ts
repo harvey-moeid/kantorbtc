@@ -99,6 +99,13 @@ describe("quote D1 budget", () => {
     expect(
       ((await response.json()) as { quotes: Quote[] }).quotes[0],
     ).toMatchObject({ price: 399, status: "live" });
+    const health = await s.hub.fetch(new Request("https://hub/health"));
+    expect(await health.json()).toEqual({
+      markets: [
+        { symbol: "BTCUSDT", status: "fresh" },
+        { symbol: "XAUUSD", status: "missing" },
+      ],
+    });
     vi.advanceTimersByTime(1000);
     await s.tick(400);
     expect(s.writes).toHaveBeenCalledTimes(2);

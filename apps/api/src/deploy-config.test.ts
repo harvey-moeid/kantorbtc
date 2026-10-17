@@ -28,6 +28,7 @@ describe("Cloudflare deployment configuration", () => {
     expect(config.triggers).toEqual(base.triggers);
     expect(config.durable_objects).toEqual(base.durable_objects);
     expect(config.migrations).toEqual(base.migrations);
+    expect(config.observability).toEqual(base.observability);
     expect(base.d1_databases[0].database_id).toBe(
       "00000000-0000-0000-0000-000000000000",
     );
