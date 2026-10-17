@@ -15,7 +15,7 @@ import { saveSettings, settings, slots } from "./data";
 import { defaultSlots, providerNames, type Env } from "./env";
 import { marketCandles, persistCandles } from "./market";
 import { safeWebhook } from "./notifications";
-import { createBackfill } from "./backfill";
+import { backfillEnabled, backfillSwitches, createBackfill, setBackfillEnabled } from "./backfill";
 import { testProvider } from "./provider-test";
 import { applicationHealth, applicationReadiness } from "./health";
 export { MarketHub } from "./hub";
@@ -447,8 +447,19 @@ app.get("/api/backfill", async (c) =>
         "SELECT * FROM backfill_jobs ORDER BY updated_at DESC LIMIT 100",
       ).all()
     ).results,
+    enabled: await backfillSwitches(c.env),
   }),
 );
+app.put("/api/backfill/:symbol/enabled", async (c) => {
+  const symbol = z.enum(symbols).safeParse(c.req.param("symbol"));
+  const parsed = z.object({ enabled: z.boolean() }).strict().safeParse(await c.req.json());
+  if (!symbol.success || !parsed.success)
+    return c.json({ error: "Simbol atau nilai ON/OFF tidak valid." }, 400);
+  if (c.env.APP_MODE !== "live")
+    return c.json({ error: "Pengaturan backfill membutuhkan mode live." }, 409);
+  await setBackfillEnabled(c.env, symbol.data, parsed.data.enabled);
+  return c.json({ symbol: symbol.data, enabled: parsed.data.enabled });
+});
 app.post("/api/backfill", async (c) => {
   const parsed = z
     .object({
@@ -472,6 +483,8 @@ app.post("/api/backfill", async (c) => {
       { error: "Backfill membutuhkan mode live dan akses provider." },
       409,
     );
+  if (!(await backfillEnabled(c.env, parsed.data.symbol)))
+    return c.json({ error: "Backfill simbol ini OFF. Aktifkan sakelar terlebih dahulu." }, 409);
   const pending = await c.env.DB.prepare(
     "SELECT id FROM backfill_jobs WHERE symbol=? AND status='pending'",
   )
@@ -492,6 +505,12 @@ app.post("/api/backfill", async (c) => {
 app.post("/api/backfill/:id/resume", async (c) => {
   if (c.env.APP_MODE !== "live")
     return c.json({ error: "Mode live dibutuhkan." }, 409);
+  const job = await c.env.DB.prepare(
+    "SELECT symbol FROM backfill_jobs WHERE id=?",
+  ).bind(c.req.param("id")).first<{ symbol: (typeof symbols)[number] }>();
+  if (!job) return c.json({ error: "Job tidak ditemukan." }, 404);
+  if (!(await backfillEnabled(c.env, job.symbol)))
+    return c.json({ error: "Backfill simbol ini OFF. Aktifkan sakelar terlebih dahulu." }, 409);
   await c.env.DB.prepare(
     "UPDATE backfill_jobs SET status='pending',error=NULL,updated_at=? WHERE id=? AND status='failed'",
   )
