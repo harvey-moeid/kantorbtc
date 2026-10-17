@@ -55,6 +55,8 @@ afterEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
 
+});
+describe("global historical backfill budget", () => {
   it("defaults each symbol to OFF and keeps pending jobs without spending a budget marker", async () => {
     const env = setup();
     db.exec(
@@ -103,8 +105,7 @@ afterEach(() => {
     expect(persistCandles).not.toHaveBeenCalled();
     expect(db.prepare("SELECT cursor_time AS t FROM backfill_jobs WHERE id='a'").get()?.t).toBe(1000);
   });
-});
-describe("global historical backfill budget", () => {
+
   it("takes one page across all jobs per 15 minutes, including after restart", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1000000);
