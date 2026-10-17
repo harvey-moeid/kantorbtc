@@ -61,7 +61,10 @@ export default function DataOperations() {
           to: Date.parse(to + "T00:00:00Z") / 1000,
         }),
       });
-      const data = await api<{ jobs: Job[] }>("/backfill");
+      const data = await api<{
+        jobs: Job[];
+        enabled: Record<Symbol, boolean>;
+      }>("/backfill");
       setJobs(data.jobs);
       setEnabled(data.enabled);
       useStore
