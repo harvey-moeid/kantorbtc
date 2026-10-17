@@ -16,6 +16,11 @@ import { defaultSlots, providerNames, type Env } from "./env";
 import { marketCandles, persistCandles } from "./market";
 import { safeWebhook } from "./notifications";
 import { createBackfill } from "./backfill";
+import {
+  backfillFlags,
+  isBackfillEnabled,
+  setBackfillEnabled,
+} from "./backfill-control";
 import { testProvider } from "./provider-test";
 import { applicationHealth, applicationReadiness } from "./health";
 export { MarketHub } from "./hub";
@@ -447,8 +452,34 @@ app.get("/api/backfill", async (c) =>
         "SELECT * FROM backfill_jobs ORDER BY updated_at DESC LIMIT 100",
       ).all()
     ).results,
+    enabled: await backfillFlags(c.env),
   }),
 );
+app.put("/api/backfill/settings/:symbol", async (c) => {
+  const symbol = z.enum(symbols).safeParse(c.req.param("symbol").toUpperCase());
+  const parsed = z
+    .object({ enabled: z.boolean() })
+    .strict()
+    .safeParse(await c.req.json());
+  if (!symbol.success || !parsed.success)
+    return c.json({ error: "Aset atau status backfill tidak valid." }, 400);
+  const previous = await isBackfillEnabled(c.env, symbol.data);
+  await setBackfillEnabled(c.env, symbol.data, parsed.data.enabled);
+  // First activation bootstraps history only if no jobs ever existed.
+  // Failed/pending jobs retain their cursor instead of being recreated.
+  if (parsed.data.enabled && !previous && c.env.APP_MODE === "live") {
+    const existing = await c.env.DB.prepare(
+      "SELECT id FROM backfill_jobs WHERE symbol=? LIMIT 1",
+    )
+      .bind(symbol.data)
+      .first();
+    if (!existing) {
+      const now = Math.floor(Date.now() / 1000);
+      await createBackfill(c.env, symbol.data, now - 31536000, now);
+    }
+  }
+  return c.json({ enabled: await backfillFlags(c.env) });
+});
 app.post("/api/backfill", async (c) => {
   const parsed = z
     .object({
@@ -472,6 +503,11 @@ app.post("/api/backfill", async (c) => {
       { error: "Backfill membutuhkan mode live dan akses provider." },
       409,
     );
+  if (!(await isBackfillEnabled(c.env, parsed.data.symbol)))
+    return c.json(
+      { error: "Aktifkan backfill aset ini terlebih dahulu." },
+      409,
+    );
   const pending = await c.env.DB.prepare(
     "SELECT id FROM backfill_jobs WHERE symbol=? AND status='pending'",
   )
@@ -492,12 +528,27 @@ app.post("/api/backfill", async (c) => {
 app.post("/api/backfill/:id/resume", async (c) => {
   if (c.env.APP_MODE !== "live")
     return c.json({ error: "Mode live dibutuhkan." }, 409);
-  await c.env.DB.prepare(
+  const job = await c.env.DB.prepare(
+    "SELECT symbol,status FROM backfill_jobs WHERE id=?",
+  )
+    .bind(c.req.param("id"))
+    .first<{ symbol: (typeof symbols)[number]; status: string }>();
+  if (!job) return c.json({ error: "Job backfill tidak ditemukan." }, 404);
+  if (!symbols.includes(job.symbol))
+    return c.json({ error: "Aset job tidak valid." }, 400);
+  if (!(await isBackfillEnabled(c.env, job.symbol)))
+    return c.json(
+      { error: "Aktifkan backfill aset ini terlebih dahulu." },
+      409,
+    );
+  const result = await c.env.DB.prepare(
     "UPDATE backfill_jobs SET status='pending',error=NULL,updated_at=? WHERE id=? AND status='failed'",
   )
     .bind(Date.now(), c.req.param("id"))
     .run();
-  return c.json({ resumed: true });
+  return result.meta.changes
+    ? c.json({ resumed: true })
+    : c.json({ error: "Hanya job gagal yang dapat dilanjutkan." }, 409);
 });
 app.all("/api/*", (c) => c.json({ error: "Endpoint tidak ditemukan." }, 404));
 app.all("*", (c) => c.env.ASSETS.fetch(c.req.raw));

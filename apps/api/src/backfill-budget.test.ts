@@ -58,7 +58,7 @@ describe("global historical backfill budget", () => {
     vi.setSystemTime(1000000);
     const env = setup();
     db.exec(
-      "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES('a','BTCUSDT','5m',0,1000,1000,0),('b','XAUUSD','5m',0,1000,1000,1)",
+      "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES('a','BTCUSDT','5m',0,1000,1000,0),('b','BTCUSDT','15m',0,1000,1000,1)",
     );
     await backfillChunk(env);
     vi.advanceTimersByTime(15000);
