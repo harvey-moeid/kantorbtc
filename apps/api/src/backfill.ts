@@ -18,6 +18,44 @@ export interface BackfillJob {
   error: string | null;
   updated_at: number;
 }
+// Historical backfill is opt-in per symbol. Normal live candle ingestion is unaffected.
+export const backfillSettingId = (symbol: Symbol) => `backfill_enabled:${symbol}`;
+
+export async function backfillEnabled(env: Env, symbol: Symbol): Promise<boolean> {
+  const row = await env.DB.prepare(
+    "SELECT value_json FROM settings WHERE id=?",
+  )
+    .bind(backfillSettingId(symbol))
+    .first<{ value_json: string }>();
+  return row?.value_json === "true";
+}
+
+export async function backfillSwitches(env: Env): Promise<Record<Symbol, boolean>> {
+  const { results } = await env.DB.prepare(
+    "SELECT id,value_json FROM settings WHERE id IN (?,?)",
+  )
+    .bind(...symbols.map(backfillSettingId))
+    .all<{ id: string; value_json: string }>();
+  const enabledIds = new Set(
+    results.filter((r) => r.value_json === "true").map((r) => r.id),
+  );
+  return Object.fromEntries(
+    symbols.map((symbol) => [symbol, enabledIds.has(backfillSettingId(symbol))]),
+  ) as Record<Symbol, boolean>;
+}
+
+export async function setBackfillEnabled(
+  env: Env,
+  symbol: Symbol,
+  enabled: boolean,
+) {
+  await env.DB.prepare(
+    "INSERT INTO settings(id,value_json,version,updated_at) VALUES(?,?,1,?) ON CONFLICT(id) DO UPDATE SET value_json=excluded.value_json,version=settings.version+1,updated_at=excluded.updated_at WHERE settings.value_json<>excluded.value_json",
+  )
+    .bind(backfillSettingId(symbol), JSON.stringify(enabled), Date.now())
+    .run();
+}
+
 export async function createBackfill(
   env: Env,
   symbol: Symbol,
@@ -51,13 +89,13 @@ export async function backfillChunk(env: Env) {
   // Take the slot atomically before provider I/O, including failed attempts.
   const now = Date.now();
   const slot = await env.DB.prepare(
-    "INSERT INTO settings(id,value_json,version,updated_at) SELECT 'backfill_last_attempt','true',1,? WHERE EXISTS(SELECT 1 FROM backfill_jobs WHERE status='pending') ON CONFLICT(id) DO UPDATE SET updated_at=excluded.updated_at WHERE settings.updated_at<=excluded.updated_at-900000 RETURNING id",
+    "INSERT INTO settings(id,value_json,version,updated_at) SELECT 'backfill_last_attempt','true',1,? WHERE EXISTS(SELECT 1 FROM backfill_jobs j JOIN settings s ON s.id='backfill_enabled:' || j.symbol AND s.value_json='true' WHERE j.status='pending') ON CONFLICT(id) DO UPDATE SET updated_at=excluded.updated_at WHERE settings.updated_at<=excluded.updated_at-900000 RETURNING id",
   )
     .bind(now)
     .first<{ id: string }>();
   if (!slot) return;
   const job = await env.DB.prepare(
-    "SELECT * FROM backfill_jobs WHERE status='pending' ORDER BY updated_at LIMIT 1",
+    "SELECT j.* FROM backfill_jobs j JOIN settings s ON s.id='backfill_enabled:' || j.symbol AND s.value_json='true' WHERE j.status='pending' ORDER BY j.updated_at LIMIT 1",
   ).first<BackfillJob>();
   if (!job) return;
   try {
@@ -68,6 +106,9 @@ export async function backfillChunk(env: Env) {
     const filtered = data.candles.filter(
       (c) => c.time >= job.from_time && c.time < job.to_time,
     );
+    // A symbol may be switched OFF while its provider request is in flight.
+    // Re-check before any candle writes or cursor updates.
+    if (!(await backfillEnabled(env, job.symbol))) return;
     if (filtered.length)
       await persistCandles(env, job.symbol, job.tf, {
         ...data,
@@ -85,6 +126,7 @@ export async function backfillChunk(env: Env) {
       )
       .run();
   } catch {
+    if (!(await backfillEnabled(env, job.symbol))) return;
     await env.DB.prepare(
       "UPDATE backfill_jobs SET status='failed',error=?,updated_at=? WHERE id=?",
     )
