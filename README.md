@@ -4,6 +4,8 @@ Aplikasi kantor trading 3D untuk BTCUSDT dan XAUUSD, dibangun dari `PRD_Kantor_T
 
 Pekerjaan yang belum selesai, urutan prioritas, dependensi, dan kriteria penerimaan dicatat di [rencana proyek](docs/PROJECT_PLAN.md).
 
+Backend menyediakan health D1/konfigurasi, readiness data pasar privat, deadline Workers AI, serta transaksi alert/outbox. Cara memeriksa dan batas penerimaannya ada di [panduan operasi](docs/OPERATIONS.md).
+
 ## Menjalankan lokal
 
 Prasyarat: Node.js 24 dan pnpm 11.25.0. Tidak perlu API key untuk menjelajahi demo.
@@ -91,7 +93,7 @@ python tests/alert_smoke.py
 
 Jalankan kedua server sebelum smoke browser. Screenshot disimpan di `test-results/`, yang diabaikan Git. Tes browser memeriksa privasi publik, perpindahan lantai, karakter, chart/indikator, alert, filter, detail sinyal/meeting, pengaturan, bahasa, dan responsivitas 390 px. Smoke alert memeriksa edit numerik, validasi harga, drag desktop/sentuhan ponsel, batal/konfirmasi, keyboard, isolasi aset, dan bahwa demo tidak mengirim perubahan ke API privat.
 
-176 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
+229 tes otomatis lulus. Smoke meeting memeriksa seluruh pembicara, kamera, penolakan scanner yang melewati AI, replay, jeda tab, reduced motion, serta reconnect dan penyaringan stream publik. Untuk menguji build produksi, tambahkan `KANTOR_BASE_URL=http://127.0.0.1:8787` pada smoke meeting.
 
 Alert aktif yang belum terpicu ditampilkan sebagai garis pada chart. Geser pegangan garis untuk memilih level baru lalu konfirmasikan di formulir, atau gunakan tombol **Ubah alert** untuk mengisi harga langsung. Enter/Space pada pegangan membuka editor yang sama. Menutup formulir mempertahankan level tersimpan. Alert terpicu/nonaktif tidak bisa diedit atau diaktifkan ulang melalui perubahan harga; buat alert baru bila diperlukan. Mode demo hanya mengubah state sesi lokal, sedangkan workspace privat menyimpan perubahan di D1.
 

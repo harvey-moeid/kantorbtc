@@ -9,6 +9,7 @@ import {
 import type { Env, Slot } from "./env";
 import { credential } from "./data";
 import { fetchJson } from "./market";
+import { withDeadline } from "./deadline";
 const endpoints: Record<string, string> = {
   Groq: "https://api.groq.com/openai/v1/chat/completions",
   OpenRouter: "https://openrouter.ai/api/v1/chat/completions",
@@ -46,9 +47,18 @@ export async function callSlot(
       let output: unknown;
       if (slot.provider === "Workers AI") {
         if (!env.AI) return abstain();
-        const result = await env.AI.run(
-          slot.model as Parameters<Ai["run"]>[0],
-          { messages: [{ role: "user", content: prompt }], max_tokens: 1000 },
+        const ai = env.AI;
+        const result = await withDeadline(
+          (signal) =>
+            ai.run(
+              slot.model as Parameters<Ai["run"]>[0],
+              {
+                messages: [{ role: "user", content: prompt }],
+                max_tokens: 1000,
+              },
+              { signal },
+            ),
+          12000,
         );
         output = (result as { response?: string }).response;
       } else {

@@ -24,4 +24,5 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["MarketHub"] }],
   "triggers": { "crons": ["*/5 * * * *"] },
   "vars": { "APP_MODE": "live" },
+  "observability": { "enabled": true, "head_sampling_rate": 1 },
 }

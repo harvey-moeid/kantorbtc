@@ -5,15 +5,23 @@ export async function claimPriceAlert(
   id: string,
   price: number,
   at: number,
+  content?: string,
 ): Promise<boolean> {
   // A tick may have read the old level before a concurrent edit or deletion.
   // Only the unchanged, active one-shot alert can be claimed for delivery.
-  const claimed = await env.DB.prepare(
+  const claim = env.DB.prepare(
     "UPDATE alerts SET fired=1,last_sent_at=? WHERE id=? AND price=? AND enabled=1 AND fired=0 RETURNING id",
-  )
-    .bind(at, id, price)
-    .first<{ id: string }>();
-  return !!claimed;
+  ).bind(at, id, price);
+  if (content === undefined) return !!(await claim.first<{ id: string }>());
+  // D1 batch is a transaction. A failed insert or claim rolls back both;
+  // a concurrent edit/delete cannot create an outbox row for an old level.
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      "INSERT OR IGNORE INTO alert_outbox(id,content,retry_at,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM alerts WHERE id=? AND price=? AND enabled=1 AND fired=0)",
+    ).bind(`price-${id}`, content.slice(0, 1900), at, at, id, price),
+    claim,
+  ]);
+  return results[1].meta.changes === 1;
 }
 export async function enqueue(env: Env, id: string, content: string) {
   const now = Date.now();

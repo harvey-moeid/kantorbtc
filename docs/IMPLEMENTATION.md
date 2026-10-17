@@ -24,7 +24,15 @@ Kode adalah fondasi MVP yang berjalan lokal; matriks ini memisahkan fitur lokal 
 
 Pemilik mengizinkan rekomendasi operasional TTL dan voting: TTL default 5m/15m/H1/H4/D1 = 30 menit/90 menit/6 jam/24 jam/5 hari; margin scanner untuk seri 2–2 = 30 poin, dengan jumlah kelompok pendukung lebih banyak. Mayoritas tetap 3/4 AI. Nilai dapat diedit atau dinonaktifkan dengan mengosongkan kolom pada Pengaturan → Scanner & risiko. Tombol rekomendasi hanya mengisi TTL/margin tanpa mereset pengaturan lain; Simpan menerapkannya. Konfigurasi tersimpan tidak ditimpa otomatis; perubahan TTL hanya berlaku untuk sinyal baru. Aturan pembatalan/konflik bagian 21 PRD masih terbuka. Pelacakan awal mengandalkan tick teramati, TTL terus berjalan, TP terakhir menutup sinyal, dan belum melakukan pembatalan otomatis pada konflik. Tidak ada klaim profit, kualitas sinyal, lisensi publik, atau kemampuan eksekusi order.
 
-## Pengujian dalam sesi implementasi
+## Perbaikan keandalan backend
+
+Alert harga dan insert outbox kini satu transaksi D1; rollback dan tick dengan level lama diuji dengan SQLite. Workers AI dibatasi 12 detik per percobaan, maksimal satu retry; binding yang mengabaikan abort tidak menahan keputusan tanpa batas. Health publik memeriksa skema inti D1 dan konfigurasi live. Readiness privat memeriksa kesegaran observasi MarketHub, termasuk konfirmasi ulang pasar emas yang tutup. Workers Logs diaktifkan dalam konfigurasi deployment. Detail operasional dan batas yang belum tervalidasi ada di [panduan operasi](OPERATIONS.md).
+
+Suite terbaru meluluskan 229 tes; enam tes provider live dilewati pada suite default. Tes baru mencakup rollback outbox/claim, timeout dan hasil AI terlambat, skema database belum lengkap, otorisasi/redaksi health, kegagalan hub, serta kesegaran harga dan observasi. Target produksi dan integrasi akun nyata tetap belum dinyatakan selesai.
+
+Tiga smoke browser desktop/ponsel, build/typecheck, format, dan packaging Worker dry run juga lulus. Probe workerd/D1 lokal memverifikasi claim one-shot, penolakan duplikasi, serta rollback outbox ketika update alert gagal. Audit dependensi produksi melaporkan nol kerentanan. Health pada Worker lokal mengembalikan kedua pemeriksaan true; readiness tanpa login ditolak dengan HTTP 401.
+
+## Pengujian dalam sesi implementasi awal
 
 - Build TypeScript/Vite produksi dan 161 tes otomatis lulus; enam tes jaringan opsional dilewati pada suite default dan lulus saat dijalankan terpisah pada sesi implementasi awal.
 - Tes engine, crypto, structure, upstream state machine, timeline presentasi/waiting, jalur tangga/rutinitas, kebijakan FPS, validasi payload, reconnect, dan broadcast privat/publik.

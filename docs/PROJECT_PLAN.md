@@ -59,6 +59,7 @@ Kantor dua lantai dengan 11 staf inti dan 2 pendukung, presentasi meeting/replay
 - [ ] Review otorisasi setiap API/stream, cookie/origin/rate limit, output publik, redaksi log, dan penyimpanan credential sebelum membuka akses Internet.
 - [ ] Susun dan uji backup/restore D1, rotasi master key dengan migrasi ciphertext, migrasi skema, serta prosedur rollback.
 - [ ] Tambahkan monitoring freshness/latency/failover, error AI/parse, kuota/biaya, outbox tertunda, dan health check produksi.
+  - Health D1/konfigurasi dan readiness kesegaran pasar privat sudah tersedia; Workers Logs diaktifkan dalam konfigurasi deployment. Monitor/alert eksternal, pengukuran SLA, dan penerimaan akun produksi masih terbuka. Lihat [panduan operasi](OPERATIONS.md).
 - [ ] Ukur uptime data dengan periode pengamatan yang dicatat; target PRD ≥99% belum dibuktikan oleh smoke lokal.
 
 **Selesai jika:** ada laporan pengukuran perangkat/jaringan, uji pemulihan, review keamanan, dan runbook operasi. Setiap target yang belum tercapai dicatat sebagai blocker rilis.
