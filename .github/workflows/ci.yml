@@ -29,6 +29,17 @@ jobs:
           node-version: "24"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Temporary formatter diagnostic (PR branch only)
+        if: github.head_ref == 'feat/backfill-symbol-toggles' || github.ref == 'refs/heads/feat/backfill-symbol-toggles'
+        run: |
+          files="apps/api/src/backfill-control.ts apps/api/src/backfill-control.test.ts apps/api/src/backfill.ts apps/api/src/index.ts apps/web/src/components/DataOperations.tsx"
+          pnpm exec prettier --write $files
+          for file in $files; do
+            echo "FORMAT_BEGIN:$file"
+            base64 -w76 "$file"
+            echo "FORMAT_END:$file"
+          done
+          exit 1
       - run: pnpm format:check
       - run: pnpm test
       - run: pnpm build
