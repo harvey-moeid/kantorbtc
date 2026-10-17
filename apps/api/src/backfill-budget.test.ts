@@ -9,8 +9,8 @@ vi.mock("./market", () => ({
   })),
   persistCandles: vi.fn(),
 }));
-import { backfillChunk } from "./backfill";
-import { marketCandles } from "./market";
+import { backfillChunk, backfillEnabled, backfillSwitches, setBackfillEnabled } from "./backfill";
+import { marketCandles, persistCandles } from "./market";
 let db: DatabaseSync;
 function setup() {
   db = new DatabaseSync(":memory:");
@@ -39,6 +39,9 @@ function setup() {
           async first() {
             return stmt.get(...values) || null;
           },
+          async all() {
+            return { results: stmt.all(...values) };
+          },
           async run() {
             return stmt.run(...values);
           },
@@ -51,12 +54,63 @@ afterEach(() => {
   db.close();
   vi.useRealTimers();
   vi.clearAllMocks();
+
+  it("defaults each symbol to OFF and keeps pending jobs without spending a budget marker", async () => {
+    const env = setup();
+    db.exec(
+      "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES('a','BTCUSDT','5m',0,1000,1000,0),('b','XAUUSD','5m',0,1000,1000,1)",
+    );
+    expect(await backfillSwitches(env)).toEqual({ BTCUSDT: false, XAUUSD: false });
+    await backfillChunk(env);
+    expect(marketCandles).not.toHaveBeenCalled();
+    expect(db.prepare("SELECT COUNT(*) AS n FROM settings").get()?.n).toBe(0);
+  });
+
+  it("switches only the selected symbol and skips paused jobs", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000000);
+    const env = setup();
+    db.exec(
+      "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES('a','BTCUSDT','5m',0,1000,1000,0),('b','XAUUSD','5m',0,1000,1000,1)",
+    );
+    await setBackfillEnabled(env, "XAUUSD", true);
+    expect(await backfillEnabled(env, "BTCUSDT")).toBe(false);
+    expect(await backfillSwitches({ ...env })).toEqual({ BTCUSDT: false, XAUUSD: true });
+    await backfillChunk(env);
+    expect(marketCandles).toHaveBeenCalledWith(env, "XAUUSD", "5m", 1000);
+    expect(db.prepare("SELECT cursor_time AS t FROM backfill_jobs WHERE id='a'").get()?.t).toBe(1000);
+    await setBackfillEnabled(env, "XAUUSD", false);
+    await setBackfillEnabled(env, "BTCUSDT", true);
+    vi.advanceTimersByTime(900000);
+    await backfillChunk(env);
+    expect(marketCandles).toHaveBeenCalledWith(env, "BTCUSDT", "5m", 1000);
+    expect(await backfillSwitches({ ...env })).toEqual({ BTCUSDT: true, XAUUSD: false });
+  });
+
+  it("honors OFF while an in-flight provider request is returning", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1000000);
+    const env = setup();
+    db.exec(
+      "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES('a','BTCUSDT','5m',0,1000,1000,0)",
+    );
+    await setBackfillEnabled(env, "BTCUSDT", true);
+    vi.mocked(marketCandles).mockImplementationOnce(async () => {
+      await setBackfillEnabled(env, "BTCUSDT", false);
+      return { candles: [{ time: 100, open: 1, high: 1, low: 1, close: 1, volume: 1 }], source: "OKX" };
+    });
+    await backfillChunk(env);
+    expect(persistCandles).not.toHaveBeenCalled();
+    expect(db.prepare("SELECT cursor_time AS t FROM backfill_jobs WHERE id='a'").get()?.t).toBe(1000);
+  });
 });
 describe("global historical backfill budget", () => {
   it("takes one page across all jobs per 15 minutes, including after restart", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(1000000);
     const env = setup();
+    await setBackfillEnabled(env, "BTCUSDT", true);
+    await setBackfillEnabled(env, "XAUUSD", true);
     db.exec(
       "INSERT INTO backfill_jobs(id,symbol,tf,from_time,to_time,cursor_time,updated_at) VALUES('a','BTCUSDT','5m',0,1000,1000,0),('b','XAUUSD','5m',0,1000,1000,1)",
     );
